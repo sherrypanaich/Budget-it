@@ -12,6 +12,7 @@
 - **Connect your own AI assistant.** Link Claude, Muse or ChatGPT from Settings, with one tap if you're already signed in, and make read-only keys.
 
 ### New
+- New home screen icon: a gold coin with a pink slice. After updating, remove Budget it from your home screen and add it again to see it.
 - Settings has a new **AI assistants** page: your connector link with a Copy button, steps for adding it to Claude, and a list of the assistants and keys that act as you, with when each was last used. Make your own key there (it's shown once), tick **Read only** for an assistant that should only look, and disconnect one or all of them with a tap.
 - One-tap Allow: if you're already signed in to Budget it in that browser, connecting an assistant takes one tap. This also fixes the dead end for people who signed up with Google and have no password. The page shows where access goes ("Budget it sends access to: claude.ai").
 - `node server.js mcp-key NAME --read-only` makes a read-only key on the laptop.
