@@ -1,6 +1,6 @@
 // Budget it service worker: lets phones install the app, keeps a copy of the app and the
 // latest data so it opens away from wifi, and shows notifications.
-const SHELL = 'budget-it-shell-v1', DATA = 'budget-it-data-v1';
+const SHELL = 'budget-it-shell-v2', DATA = 'budget-it-data-v1';
 const PRECACHE = ['/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/budget.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(PRECACHE).catch(() => {}))); self.skipWaiting(); });
 self.addEventListener('activate', e => e.waitUntil((async () => {
