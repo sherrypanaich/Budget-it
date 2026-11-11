@@ -2,7 +2,7 @@
 // latest data so it opens away from wifi, and shows notifications.
 // The page and its code are always asked for fresh first, so an update reaches phones on their next open;
 // these copies are only for when the laptop can't be reached. A new name here drops the old copies.
-const SHELL = 'budget-it-shell-v2', DATA = 'budget-it-data-v1';
+const SHELL = 'budget-it-shell-v3', DATA = 'budget-it-data-v1';
 // The page's own code too (ops.js makes changes offline): without it a phone opened offline can't change anything
 const CODE = ['/budget.js', '/ops.js', '/sample.js', '/qr.js'];
 const PRECACHE = ['/manifest.webmanifest', '/icon-192.png', '/icon-512.png', ...CODE];

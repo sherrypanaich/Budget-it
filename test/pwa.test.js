@@ -108,7 +108,7 @@ test('the manifest and iPhone tags make an installable app that matches light an
     assert.match(h, /<meta name="apple-mobile-web-app-capable" content="yes">/, f);
     assert.match(h, /<meta name="apple-mobile-web-app-title" content="Budget it">/, f);
     assert.match(h, /<meta name="apple-mobile-web-app-status-bar-style" content="default">/, f);
-    assert.match(h, /<link rel="apple-touch-icon" href="\/?apple-touch-icon\.png">/, f);
+    assert.match(h, /<link rel="apple-touch-icon"(?: sizes="180x180")? href="\/?apple-touch-icon\.png(?:\?v=\d+)?">/, f);
     assert.match(h, /<link rel="manifest" href="\/?manifest\.webmanifest">/, f);
   }
   assert.equal(m.background_color.toUpperCase(), read('index.html').match(/--bg:(#[0-9A-F]{6})/i)[1].toUpperCase(), 'the splash matches the page');
