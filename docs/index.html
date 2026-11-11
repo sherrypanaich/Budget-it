@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Budget It is a free, open source budget app. It brings your bank accounts together and keeps a budget for each kind of spending, on an old laptop you already own.">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Budget It</title>
+<link rel="canonical" href="https://budgetit.ca/">
+<link rel="icon" href="images/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Dela+Gothic+One&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: a manga page. Each section is a set of inked panels on halftone paper, the same look as the app and as Split It's page. */
+:root{
+  --paper:#F5F1E8; --panel:#FFFFFF; --panel2:#F1ECE1; --ink:#14112A; --edge:#14112A; --muted:#5D5870;
+  --line:rgba(20,17,42,.14); --dot:rgba(20,17,42,.08);
+  --blue:#2D5BFF; --blue-ink:#FFFFFF; --hl:#FFD23F; --hl-ink:#14112A; --owed:#0E8A4F; --owe:#E0243C;
+  --code-bg:#1A1626; --code-fg:#F1EEFF;
+  --f-display:"Dela Gothic One","Bricolage Grotesque",system-ui,sans-serif;
+  --f-body:"Bricolage Grotesque",-apple-system,"Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#13111C; --panel:#1E1B2C; --panel2:#262238; --ink:#F1EEFF; --edge:#F1EEFF; --muted:#A9A3C2;
+  --line:rgba(241,238,255,.14); --dot:rgba(241,238,255,.06);
+  --blue:#7C9BFF; --blue-ink:#13111C; --owed:#4FD39A; --owe:#FF6B7D; --code-bg:#0B0A12; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#13111C; --panel:#1E1B2C; --panel2:#262238; --ink:#F1EEFF; --edge:#F1EEFF; --muted:#A9A3C2;
+  --line:rgba(241,238,255,.14); --dot:rgba(241,238,255,.06);
+  --blue:#7C9BFF; --blue-ink:#13111C; --owed:#4FD39A; --owe:#FF6B7D; --code-bg:#0B0A12; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background-color:var(--paper);background-image:radial-gradient(var(--dot) 1.1px,transparent 1.3px);background-size:12px 12px;
+  color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1120px;margin:0 auto}
+h1,h2,h3{font-family:var(--f-display);font-weight:400;line-height:1.08;text-wrap:balance;margin:0}
+p{margin:0}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--blue);outline-offset:3px;border-radius:6px}
+
+/* shared manga bits */
+.panel{background:var(--panel);border:3px solid var(--edge);border-radius:16px;box-shadow:6px 6px 0 var(--edge)}
+.btn{display:inline-flex;align-items:center;gap:10px;font:800 1rem/1 var(--f-body);text-decoration:none;padding:14px 20px;
+  border:2.5px solid var(--edge);border-radius:12px;background:var(--panel);color:var(--ink);box-shadow:4px 4px 0 var(--edge);
+  transition:transform .08s,box-shadow .08s;cursor:pointer}
+.btn:hover{transform:translate(-1px,-1px);box-shadow:5px 5px 0 var(--edge)}
+.btn:active{transform:translate(3px,3px);box-shadow:1px 1px 0 var(--edge)}
+.btn.y{background:var(--hl);color:var(--hl-ink)}
+.btn svg{width:20px;height:20px;flex:none}
+.tag{justify-self:start;display:inline-block;background:var(--edge);color:var(--paper);font:400 .95rem/1 var(--f-display);padding:7px 14px 6px;transform:skewX(-10deg);box-shadow:3px 3px 0 var(--hl)}
+.tag>span{display:inline-block;transform:skewX(10deg)}
+.sec{padding-block:72px 8px}
+.sec-head{display:grid;gap:16px;margin-bottom:32px;max-width:720px}
+.sec-head h2{font-size:clamp(1.9rem,5vw,3rem)}
+.sec-head p{color:var(--muted);font-size:1.1rem;max-width:60ch}
+.mono{font-family:var(--f-mono)}
+
+/* nav */
+nav.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+.brand .mark{width:44px;height:44px;border-radius:12px;background:#1A1626;color:#FFD23F;display:grid;place-items:center;font:400 1rem var(--f-display);border:2.5px solid var(--edge);box-shadow:3px 3px 0 var(--hl)}
+.brand b{font:400 1.25rem var(--f-display);display:block;line-height:1.1}
+.brand small{display:block;font-weight:800;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+nav.top ul{display:flex;gap:22px;list-style:none;margin:0;padding:0;font-weight:600;flex-wrap:wrap}
+nav.top ul a{text-decoration:none}
+nav.top ul a:hover{text-decoration:underline;text-decoration-thickness:2.5px;text-decoration-color:var(--hl);text-underline-offset:4px}
+
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:40px;align-items:center;padding-block:28px 40px}
+.hero-copy{display:grid;gap:24px;min-width:0}
+.hero h1{font-size:clamp(2.3rem,5.4vw,4.3rem);letter-spacing:-.01em}
+.hero h1 .hl{display:inline-block;line-height:1;margin-block:.06em;background:var(--hl);padding:.04em .12em .1em;border-radius:4px;color:#14112A}
+.hero .lede{font-size:1.2rem;color:var(--muted);max-width:46ch}
+.hero .ctas{display:flex;gap:14px;flex-wrap:wrap}
+.facts{display:flex;gap:10px;flex-wrap:wrap;list-style:none;padding:0;margin:0}
+.facts li{border:2px solid var(--edge);border-radius:999px;padding:5px 12px;font-weight:600;font-size:.9rem;background:var(--panel)}
+
+/* hero stage: a manga panel with speed lines, the two guides and a phone */
+.stage{position:relative;min-width:0;aspect-ratio:1/1.02;max-width:100%;border:3px solid var(--edge);border-radius:18px;box-shadow:8px 8px 0 var(--edge);overflow:hidden;
+  background:#2D5BFF;background-image:repeating-conic-gradient(from 0deg at 50% 62%,rgba(255,255,255,.18) 0deg 2.5deg,transparent 2.5deg 8deg)}
+.stage .char{position:absolute;bottom:3%;z-index:3;animation:idle 3.6s ease-in-out infinite;transform-origin:50% 100%}
+.stage .char img{display:block;width:100%;height:auto;filter:drop-shadow(5px 6px 0 rgba(20,17,42,.45))}
+.stage .c-luffy{right:1%;width:31%}
+.stage .c-hancock{left:1%;width:29%;animation-delay:-1.8s}
+@keyframes idle{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.stage .phone{position:absolute;left:50%;top:5%;transform:translateX(-50%) rotate(-3deg);width:40%;z-index:2}
+.bubble{position:absolute;z-index:3;background:#fff;color:#14112A;border:2.5px solid #14112A;border-radius:18px;padding:8px 13px;font-weight:800;font-size:clamp(.72rem,1.6vw,.92rem);line-height:1.25;box-shadow:3px 3px 0 #14112A;max-width:27%}
+.bubble::after{content:"";position:absolute;bottom:-14px;border:7px solid transparent;border-top:12px solid #14112A}
+.b-hancock{left:2%;top:30%;transform:rotate(-4deg)}
+.b-hancock::after{left:26px}
+.b-luffy{right:2%;top:24%;transform:rotate(3deg)}
+.b-luffy::after{right:26px}
+.sfx{position:absolute;z-index:3;left:50%;bottom:6%;font:400 clamp(1.4rem,4vw,2.4rem)/1 var(--f-display);color:#FFD23F;-webkit-text-stroke:2px #14112A;paint-order:stroke fill;text-shadow:3px 3px 0 #14112A;transform:translateX(-50%) rotate(-8deg)}
+
+/* phone mock (fixed light look, it's a picture of the app) */
+.phone{background:#14112A;border-radius:26px;padding:7px;box-shadow:5px 6px 0 rgba(20,17,42,.55)}
+.screen{background:#F5F1E8;border-radius:20px;overflow:hidden;color:#14112A;font-size:clamp(.5rem,1.15vw,.72rem);line-height:1.3;padding:10px 9px 12px;display:grid;gap:7px;
+  background-image:radial-gradient(rgba(20,17,42,.07) 1px,transparent 1.2px);background-size:9px 9px}
+.screen .bar{display:flex;justify-content:space-between;font-weight:800;font-size:.9em;padding:0 3px}
+.screen .bal{background:#2D5BFF;color:#fff;border:2px solid #14112A;border-radius:11px;box-shadow:3px 3px 0 #14112A;padding:8px 9px;
+  background-image:repeating-conic-gradient(from 0deg at 85% 120%,rgba(255,255,255,.16) 0deg 2.5deg,transparent 2.5deg 8deg)}
+.screen .bal small{display:block;font-weight:800;text-transform:uppercase;letter-spacing:.06em;font-size:.78em;opacity:.9}
+.screen .bal b{font:400 2.2em/1.1 var(--f-display)}
+.screen .pace{display:block;height:6px;border:1.5px solid #14112A;border-radius:99px;background:rgba(255,255,255,.35);margin-top:5px;overflow:hidden}
+.screen .pace i{display:block;height:100%;width:64%;background:#FFD23F;border-right:1.5px solid #14112A}
+.screen .safe{display:flex;justify-content:space-between;gap:6px;border:2px solid #14112A;border-radius:9px;background:#FFD23F;padding:5px 7px;font-weight:800;box-shadow:2px 2px 0 #14112A}
+.screen .h{font:400 .95em var(--f-display);margin-top:2px}
+.screen .row{display:flex;justify-content:space-between;align-items:center;gap:6px;background:#fff;border:2px solid #14112A;border-radius:9px;padding:5px 7px}
+.screen .row>div{flex:1;min-width:0}
+.screen .row i{font-style:normal;color:#5D5870;display:block;font-size:.85em}
+.screen .row .pos{color:#0E8A4F;font-weight:800;white-space:nowrap}
+.screen .row .neg{color:#E0243C;font-weight:800;white-space:nowrap}
+.screen .meter{display:block;height:5px;border:1.5px solid #14112A;border-radius:99px;background:#F1ECE1;margin-top:3px;overflow:hidden}
+.screen .meter i{display:block;height:100%;background:#2D5BFF}
+.screen .meter.over i{background:#E0243C}
+
+/* the guides */
+.cast{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;list-style:none;margin:0;padding:0}
+.cast li{display:grid;gap:2px;align-content:start;overflow:hidden;padding:0 0 16px}
+.cast .pic{display:block;background:var(--blue);border-bottom:3px solid var(--edge);padding-top:10px;
+  background-image:repeating-conic-gradient(from 0deg at 50% 100%,rgba(255,255,255,.16) 0deg 3deg,transparent 3deg 9deg)}
+.cast li:nth-child(even) .pic{background-color:var(--hl)}
+.cast .moods{display:flex;align-items:flex-end;justify-content:center;gap:2%;padding:8px 12px 0;aspect-ratio:16/9;max-width:100%}
+.cast .moods img{display:block;height:100%;width:auto;max-width:23.5%;object-fit:contain;object-position:bottom;min-width:0}
+.cast b{font:400 1.5rem var(--f-display);padding:14px 20px 0}
+.cast small{color:var(--muted);padding:0 20px;font-size:1rem;line-height:1.4}
+.cast q{display:block;margin:8px 20px 0;padding:8px 12px;border:2px solid var(--edge);border-radius:12px;background:var(--panel2);font-weight:600;font-size:.95rem;quotes:"“" "”"}
+.moodkey{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;list-style:none;margin:26px 0 0;padding:0}
+.moodkey li{border:2px solid var(--edge);border-radius:12px;background:var(--panel);padding:10px 12px;font-size:.92rem;color:var(--muted);line-height:1.35}
+.moodkey b{display:block;color:var(--ink);font:400 1rem var(--f-display)}
+
+/* how it works strip */
+.how{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
+.how .panel{padding:22px;display:grid;gap:10px;align-content:start}
+.how .step{font:400 2.4rem/1 var(--f-display);color:var(--blue)}
+.how h3{font-size:1.3rem}
+.how p{color:var(--muted)}
+
+/* feature panels: an uneven manga grid */
+.grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:20px}
+.feat{padding:24px;display:grid;gap:12px;align-content:start;min-width:0}
+.feat h3{font-size:1.35rem}
+.feat p{color:var(--muted)}
+.feat .ico{width:46px;height:46px;border:2.5px solid var(--edge);border-radius:12px;display:grid;place-items:center;background:var(--hl);color:#14112A;box-shadow:2px 2px 0 var(--edge)}
+.feat .ico svg{width:24px;height:24px}
+.w3{grid-column:span 3}.w2{grid-column:span 2}.w4{grid-column:span 4}
+.feat.blue{background:var(--blue);color:var(--blue-ink)}
+.feat.blue p{color:inherit;opacity:.9}
+.feat.blue .ico{background:var(--panel);color:var(--ink)}
+.feat ul{margin:0;padding-left:18px;color:var(--muted);display:grid;gap:4px}
+.feat.blue ul{color:inherit;opacity:.92}
+
+/* count-only-my-share demo */
+.demo{display:grid;gap:14px;margin-top:6px}
+.demo label,.demo .lbl{font-weight:800;font-size:.9rem}
+.demo .fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:14px;align-items:end}
+.demo .fields>div{display:grid;gap:6px;min-width:0}
+.demo input{width:100%;font:600 1.05rem var(--f-body);padding:12px 14px;border:2.5px solid var(--edge);border-radius:12px;background:var(--panel);color:var(--ink);box-shadow:3px 3px 0 var(--edge)}
+.demo .people{display:flex;gap:8px;flex-wrap:wrap}
+.demo .people button{font:800 1rem var(--f-body);min-width:46px;border:2.5px solid var(--edge);border-radius:12px;padding:11px 10px;background:var(--panel2);color:var(--ink);cursor:pointer}
+.demo .people button[aria-pressed="true"]{background:var(--hl);color:#14112A;box-shadow:3px 3px 0 var(--edge)}
+.parsed{display:flex;gap:8px;flex-wrap:wrap;min-height:34px}
+.parsed span{border:2px solid var(--edge);border-radius:999px;padding:4px 11px;font-weight:700;font-size:.9rem;background:var(--panel)}
+.parsed span b{color:var(--muted);font-weight:600;margin-right:4px}
+.parsed span.amt{background:var(--hl);color:#14112A}
+.parsed span.amt b{color:#5D5870}
+.parsed .none{border-style:dashed;color:var(--muted)}
+.demo .fine{font-size:.85rem;color:var(--muted)}
+
+/* self host */
+.host{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:32px;align-items:start}
+.host .notes{display:grid;gap:16px}
+.host ul:not(.reqs){margin:0;padding-left:20px;display:grid;gap:8px}
+.term{background:var(--code-bg);color:var(--code-fg);border:3px solid var(--edge);border-radius:16px;box-shadow:6px 6px 0 var(--hl);overflow:hidden;min-width:0}
+.term .tb{display:flex;align-items:center;gap:7px;padding:10px 14px;border-bottom:2px solid rgba(255,255,255,.12)}
+.term .tb i{width:11px;height:11px;border-radius:50%;background:#FF6B7D}.term .tb i:nth-child(2){background:#FFD23F}.term .tb i:nth-child(3){background:#4FD39A}
+.term .tb span{margin-left:8px;font:600 .8rem var(--f-mono);opacity:.7}
+.term pre{margin:0;padding:18px 20px;overflow-x:auto;font:400 .9rem/1.75 var(--f-mono)}
+.term .c{color:#8F8AA8}
+.term .p{color:#FFD23F}
+.copy{font:600 .78rem var(--f-body);background:transparent;border:1.5px solid rgba(255,255,255,.35);color:inherit;border-radius:8px;padding:3px 9px;margin-left:auto;cursor:pointer}
+.reqs{display:flex;gap:10px;flex-wrap:wrap;list-style:none;padding:0;margin:0}
+.reqs li{background:var(--panel);border:2px solid var(--edge);border-radius:10px;padding:6px 11px;font-weight:600;font-size:.92rem}
+
+/* open source + donate */
+.oss{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px}
+.oss .panel{padding:28px;display:grid;gap:16px;align-content:start}
+.oss h3{font-size:1.6rem}
+.oss p{color:var(--muted)}
+.donate{position:relative;background:var(--hl)!important;color:#14112A}
+.donate p{color:#3C3654!important}
+.tiers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.tier{border:2.5px solid #14112A;border-radius:12px;background:#fff;padding:12px;display:grid;gap:4px;text-align:left;font:inherit;color:#14112A;cursor:pointer;box-shadow:3px 3px 0 #14112A}
+.tier[aria-pressed="true"]{background:#14112A;color:#FFD23F}
+.tier[aria-pressed="true"] small{color:#F1EEFF}
+.tier b{font:400 1.5rem var(--f-display)}
+.tier small{color:#5D5870;font-size:.82rem;line-height:1.3}
+.donate .btn{background:#14112A;color:#FFD23F;border-color:#14112A;box-shadow:4px 4px 0 #fff;justify-self:start}
+.donate .where{font-size:.85rem}
+.donate .peek{position:absolute;right:14px;bottom:100%;width:96px;height:100px;overflow:hidden;pointer-events:none}
+.donate .peek img{width:100%;height:auto;display:block}
+.sibling{display:flex;align-items:center;gap:14px;border:2.5px solid #14112A;border-radius:14px;background:#fff;color:#14112A;padding:14px 16px;box-shadow:3px 3px 0 #14112A;text-decoration:none}
+.sibling .mark{flex:none;width:40px;height:40px;border-radius:10px;background:#2D5BFF;color:#fff;display:grid;place-items:center;font:400 .9rem var(--f-display);border:2px solid #14112A}
+.sibling b{display:block;font:400 1.1rem var(--f-display)}
+.sibling small{display:block;color:#5D5870;font-size:.88rem;line-height:1.35}
+.oss .stats{display:flex;gap:10px;flex-wrap:wrap;list-style:none;margin:0;padding:0}
+.oss .stats li{border:2px solid var(--edge);border-radius:10px;padding:6px 11px;font-weight:600;font-size:.9rem}
+
+/* faq */
+.faq{display:grid;gap:14px;max-width:820px}
+.faq details{background:var(--panel);border:2.5px solid var(--edge);border-radius:14px;box-shadow:4px 4px 0 var(--edge);padding:4px 20px}
+.faq summary{cursor:pointer;font-weight:800;font-size:1.08rem;padding:14px 0;list-style:none;display:flex;justify-content:space-between;gap:16px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";font:400 1.4rem/1 var(--f-display)}
+.faq details[open] summary::after{content:"–"}
+.faq details p{color:var(--muted);padding-bottom:16px;max-width:65ch}
+
+footer{padding-block:72px 40px;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;color:var(--muted);font-size:.95rem;border-top:2px dashed var(--line);margin-top:72px}
+footer a{font-weight:600}
+footer span{max-width:62ch}
+
+@media (max-width:860px){
+  .hero{grid-template-columns:1fr}
+  .host,.oss{grid-template-columns:1fr}
+  .how{grid-template-columns:1fr}
+  .w3,.w2,.w4{grid-column:span 6}
+  nav.top ul{display:none}
+  nav.top .btn{display:none}
+  .donate .peek{display:none}
+  .cast{grid-template-columns:1fr}
+  .moodkey{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:480px){
+  .tiers{grid-template-columns:1fr}
+  .demo .fields{grid-template-columns:1fr}
+  .stage{aspect-ratio:1/1.2}
+  .stage .phone{width:48%;top:4%}
+  .stage .c-luffy{width:33%}
+  .stage .c-hancock{width:31%}
+  .bubble{max-width:30%;font-size:.68rem;padding:6px 9px}
+  .b-hancock{top:36%}.b-luffy{top:30%}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<nav class="top" aria-label="Main">
+  <a class="brand" href="#top" aria-label="Budget It"><span class="mark">BI</span><span><small>Open source</small><b>Budget It</b></span></a>
+  <ul>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#host">Self-host</a></li>
+    <li><a href="#open-source">Open source</a></li>
+    <li><a href="#faq">FAQ</a></li>
+    <li><a href="https://splitit.budgetit.ca/">Split It</a></li>
+  </ul>
+  <a class="btn" href="https://github.com/sherrypanaich/Budget-it" style="padding:10px 14px"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.6 22.4c.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0C17.3 4.4 18.3 4.7 18.3 4.7c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.9 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A11.5 11.5 0 0 0 12 .5z"/></svg>Star on GitHub</a>
+</nav>
+
+<header class="hero" id="top">
+  <div class="hero-copy">
+    <span class="tag"><span>Open source · runs at home</span></span>
+    <h1>Your money. Your laptop. Your <span class="hl">business.</span></h1>
+    <p class="lede">Budget It brings your bank accounts together, sorts your spending and keeps a budget for each kind of it. It runs on an old laptop you already own, and your budget is stored there, not with us.</p>
+    <div class="ctas">
+      <a class="btn y" href="#host"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l6-6-6-6M12 19h8"/></svg>Install in one command</a>
+      <a class="btn" href="#donate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21.2l8.8-8.8a5.5 5.5 0 0 0 0-7.8z"/></svg>Support the project</a>
+    </div>
+    <ul class="facts" aria-label="At a glance">
+      <li>No ads, no tracking</li><li>Zero npm packages</li><li>Works on any phone</li><li>MIT licence</li>
+    </ul>
+  </div>
+
+  <div class="stage" role="img" aria-label="Luffy and Boa Hancock on either side of a phone showing Budget It">
+    <div class="bubble b-hancock">Are we on budget?</div>
+    <div class="bubble b-luffy">$412 left! Meat money!</div>
+    <div class="phone" aria-hidden="true">
+      <div class="screen">
+        <div class="bar"><span>Home</span><span>Nov</span></div>
+        <div class="bal"><small>Left to spend</small><b>$412.60</b><span class="pace"><i></i></span></div>
+        <div class="safe"><span>Safe till payday</span><span>$268</span></div>
+        <div class="h">Budgets</div>
+        <div class="row"><div><b>Groceries</b><i>$312 of $450</i><span class="meter"><i style="width:69%"></i></span></div><span class="pos">$138 left</span></div>
+        <div class="row"><div><b>Dining out</b><i>$96 of $120</i><span class="meter"><i style="width:80%"></i></span></div><span class="pos">$24 left</span></div>
+        <div class="row"><div><b>Fun</b><i>$92 of $80</i><span class="meter over"><i style="width:100%"></i></span></div><span class="neg">$12 over</span></div>
+      </div>
+    </div>
+    <span class="char c-hancock"><img src="images/hancock-calm.webp" alt="" width="252" height="375"></span>
+    <span class="char c-luffy"><img src="images/luffy-happy.webp" alt="" width="251" height="417"></span>
+    <span class="sfx">SAVED!</span>
+  </div>
+</header>
+
+<section class="sec" id="cast" aria-labelledby="cast-h">
+  <div class="sec-head"><span class="tag"><span>Meet the guides</span></span><h2 id="cast-h">Pick your guide.</h2><p>Your guide lives on your Home screen and tells you how the month is going, in their own words. Switch guides whenever you like, or turn them off.</p></div>
+  <ul class="cast">
+    <li class="panel"><span class="pic"><span class="moods">
+      <img src="images/luffy-happy.webp" alt="Luffy, happy" width="251" height="417">
+      <img src="images/luffy-calm.webp" alt="Luffy, calm" width="202" height="415">
+      <img src="images/luffy-worried.webp" alt="Luffy, worried" width="222" height="416">
+      <img src="images/luffy-celebrate.webp" alt="Luffy, celebrating" width="263" height="449">
+    </span></span><b>Luffy</b><small>Cheers when you’re on track, and panics when the snack money runs out.</small><q>Shishishi! You’re right on track. More meat money later!</q></li>
+    <li class="panel"><span class="pic"><span class="moods">
+      <img src="images/hancock-happy.webp" alt="Boa Hancock, happy" width="226" height="374">
+      <img src="images/hancock-calm.webp" alt="Boa Hancock, calm" width="252" height="375">
+      <img src="images/hancock-worried.webp" alt="Boa Hancock, worried" width="209" height="377">
+      <img src="images/hancock-celebrate.webp" alt="Boa Hancock, celebrating" width="254" height="373">
+    </span></span><b>Boa Hancock</b><small>Expects perfection from your budget, and usually gets it.</small><q>Of course you’re on budget. I expected nothing less.</q></li>
+  </ul>
+  <ul class="moodkey" aria-label="What each mood means">
+    <li><b>Happy</b>You’re on track for the month.</li>
+    <li><b>Calm</b>You’re spending a little ahead of the month.</li>
+    <li><b>Worried</b>A budget has run over.</li>
+    <li><b>Celebrating</b>You finished a savings goal.</li>
+  </ul>
+</section>
+
+<section class="sec" aria-labelledby="how-h">
+  <div class="sec-head"><span class="tag"><span>How it works</span></span><h2 id="how-h">Your laptop becomes the family accountant.</h2></div>
+  <div class="how">
+    <div class="panel"><span class="step">1</span><h3>Run the installer</h3><p>One command on any Linux machine. It sets up Node.js, copies the app and starts it every time the laptop boots.</p></div>
+    <div class="panel"><span class="step">2</span><h3>Connect your banks</h3><p>Banks connect through your own free Plaid account, read only. You sign in inside Plaid’s window, so Budget It never sees your bank password. No Plaid? Import a CSV or add accounts by hand.</p></div>
+    <div class="panel"><span class="step">3</span><h3>Set your budgets</h3><p>Budget It suggests budgets from what you spent last month. Add it to your phone’s home screen and it opens like a normal app, with notifications.</p></div>
+  </div>
+</section>
+
+<section class="sec" id="features" aria-labelledby="feat-h">
+  <div class="sec-head"><span class="tag"><span>Features</span></span><h2 id="feat-h">Everything your money does in a month.</h2><p>Built for real life: bills that repeat, a paycheque that has to last, and housemates who owe you for the groceries.</p></div>
+  <div class="grid">
+    <article class="panel feat w4">
+      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6.4 6.4"/></svg></span>
+      <h3>Count only your share</h3>
+      <p>You paid for the whole house, but only your part is your spending. Send a charge to a <a href="https://splitit.budgetit.ca/">Split It</a> group in two taps and your budget keeps just your share. Try it:</p>
+      <div class="demo">
+        <div class="fields">
+          <div><label for="paid">You paid for groceries</label><input id="paid" type="text" inputmode="decimal" value="90.00" autocomplete="off"></div>
+          <div><span class="lbl" id="ppl-l">Split between</span>
+            <div class="people" role="group" aria-labelledby="ppl-l">
+              <button type="button" id="ppl-2" data-n="2" aria-pressed="false">2</button>
+              <button type="button" id="ppl-3" data-n="3" aria-pressed="true">3</button>
+              <button type="button" id="ppl-4" data-n="4" aria-pressed="false">4</button>
+              <button type="button" id="ppl-5" data-n="5" aria-pressed="false">5</button>
+            </div>
+          </div>
+        </div>
+        <div class="parsed" id="parsed" aria-live="polite"></div>
+        <p class="fine">The demo splits equally. The app uses whatever split the group agreed on.</p>
+      </div>
+    </article>
+    <article class="panel feat blue w2">
+      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
+      <h3>A nudge before it hurts</h3>
+      <p>Phone notifications when:</p>
+      <ul>
+        <li>a budget hits 80%, and again if it runs out</li>
+        <li>a charge is much bigger than usual</li>
+        <li>a subscription starts or goes up in price</li>
+        <li>chequing is running low before bills</li>
+      </ul>
+    </article>
+    <article class="panel feat w2">
+      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h6"/><circle cx="19" cy="15" r="3"/></svg></span>
+      <h3>Budgets that keep up</h3>
+      <p>Charges sort themselves into categories, and a rule remembers your fix for next time. Leftovers can roll over, or overspending can carry into next month.</p>
+    </article>
+    <article class="panel feat w2">
+      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg></span>
+      <h3>Bills and subscriptions</h3>
+      <p>Found from charges that repeat and shown on a calendar, with what your subscriptions cost a year and a reminder the evening before one is due.</p>
+    </article>
+    <article class="panel feat w2">
+      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M9 15l2 2 4-4"/></svg></span>
+      <h3>Safe till payday</h3>
+      <p>Budget It finds your paycheque and shows what’s free to spend until the next one, after cards and bills.</p>
+    </article>
+    <article class="panel feat w3">
+      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg></span>
+      <h3>Net worth, goals and debts</h3>
+      <p>A chart of your net worth month by month, savings goals that say how much to put away to finish on time, and a pay-it-off planner for cards and loans. Investment accounts show what they hold and how they’re doing.</p>
+    </article>
+    <article class="panel feat w3">
+      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.9H21l-5.5 4.2 2.1 6.9L12 15.8 6.4 20l2.1-6.9L3 8.9h6.6z"/></svg></span>
+      <h3>Ask your AI assistant</h3>
+      <p>There is no AI inside Budget It. A built-in MCP connector lets your own assistant, like Claude, Muse or ChatGPT, answer “how much did I spend on dining this month?” or add a cash purchase for you.</p>
+    </article>
+    <article class="panel feat w2">
+      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></svg></span>
+      <h3>A private budget each</h3>
+      <p>Invite the people you live with by link. Everyone gets their own private budget and can share chosen accounts with the rest, read only.</p>
+    </article>
+    <article class="panel feat w2">
+      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>
+      <h3>Other currencies</h3>
+      <p>A US dollar or euro account keeps its own money, and your net worth, goals and safe-to-spend add up in your home currency.</p>
+    </article>
+    <article class="panel feat w2">
+      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L4.8 8.3l5-.7zM6 21h12"/></svg></span>
+      <h3>Your year</h3>
+      <p>What came in, what went out and how much you kept, your top five places, and your biggest and lightest months.</p>
+    </article>
+  </div>
+</section>
+
+<section class="sec" id="host" aria-labelledby="host-h">
+  <div class="host">
+    <div class="notes">
+      <span class="tag" style="justify-self:start"><span>Self-host</span></span>
+      <h2 id="host-h" style="font-size:clamp(1.9rem,5vw,3rem)">That old laptop in the closet is enough.</h2>
+      <p style="color:var(--muted);font-size:1.1rem">Budget It is plain Node.js with no packages to install. It sits next to Split It on the same laptop, and everything it knows is a folder on your own disk.</p>
+      <ul class="reqs" aria-label="Requirements">
+        <li>Linux (Ubuntu, Mint, Debian)</li><li>Node.js 22+</li><li>A free Plaid account, for banks</li><li>A free Tailscale account</li>
+      </ul>
+      <ul>
+        <li>Backups every day, and you can lock them with a passphrase and copy them to a USB drive.</li>
+        <li>A sign-in code from an authenticator app, for when it’s reachable from outside your home.</li>
+        <li>Starts on boot and keeps running with the lid closed.</li>
+        <li>Updating is the same command. Your data stays put.</li>
+      </ul>
+    </div>
+    <div class="term">
+      <div class="tb"><i></i><i></i><i></i><span>~/budget-it</span><button class="copy" type="button" id="copyBtn">Copy</button></div>
+<pre id="cmds"><span class="c"># 1. Download and install</span>
+<span class="p">$</span> git clone https://github.com/sherrypanaich/budget-it
+<span class="p">$</span> cd budget-it && bash install.sh
+
+<span class="c"># 2. Add yourself. The first person runs it.</span>
+<span class="p">$</span> cd ~/budget-it && node server.js add-user Sam
+
+<span class="c"># 3. Reach it from your phone, free</span>
+<span class="p">$</span> sudo tailscale funnel --bg 8090
+<span class="c">  → https://old-laptop.tail1234.ts.net</span></pre>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="open-source" aria-labelledby="oss-h">
+  <div class="sec-head"><span class="tag"><span>Open source</span></span><h2 id="oss-h">Made for one budget. Shared with everyone.</h2><p>Budget It started as one household’s way to stop guessing where the money went. It’s free to use, change and share, and it always will be.</p></div>
+  <div class="oss">
+    <div class="panel">
+      <h3>Build it with us</h3>
+      <p>Found a bug, a bank export the CSV import can’t read, or a category that sorts wrong? Open an issue or send a pull request. The whole app is plain HTML and JavaScript, with tests that run without a bank.</p>
+      <ul class="stats"><li>MIT licence</li><li>Node.js</li><li>No build step</li><li>CAD by default, 16 currencies</li></ul>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <a class="btn" href="https://github.com/sherrypanaich/Budget-it">View the code</a>
+        <a class="btn" href="https://github.com/sherrypanaich/Budget-it/issues/new">Report a bug</a>
+      </div>
+      <a class="sibling" href="https://splitit.budgetit.ca/"><span class="mark">SI</span><span><b>Split It</b><small>Also from Budget It: split bills with housemates, on the same laptop.</small></span></a>
+    </div>
+    <div class="panel donate" id="donate">
+      <div class="peek" aria-hidden="true"><img src="images/luffy-celebrate.webp" alt="" width="263" height="449"></div>
+      <h3>Chip in</h3>
+      <p>Budget It is free and has no ads. One fund keeps Budget It and Split It going, and $30 covers about a month of running costs.</p>
+      <div class="tiers" role="group" aria-label="Pick an amount">
+        <button class="tier" type="button" id="tier-5" aria-pressed="false" data-amt="5"><b>$5</b><small>About a week of running</small></button>
+        <button class="tier" type="button" id="tier-15" aria-pressed="false" data-amt="15"><b>$15</b><small>Half a month</small></button>
+        <button class="tier" type="button" id="tier-30" aria-pressed="true" data-amt="30"><b>$30</b><small>One full month</small></button>
+      </div>
+      <a class="btn" id="donateBtn" href="https://github.com/sponsors/sherrypanaich">Donate $30</a>
+      <p class="where">Donations go through <b>GitHub Sponsors</b>, monthly or one-time. They aren’t tax-deductible and don’t come with a receipt. The running total and where the money goes are on <a href="https://splitit.budgetit.ca/#donate">Split It’s page</a>.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="faq" aria-labelledby="faq-h">
+  <div class="sec-head"><span class="tag"><span>FAQ</span></span><h2 id="faq-h">Questions people ask first.</h2></div>
+  <div class="faq">
+    <details open><summary>Is it really free?</summary><p>Yes. The app is free and open source, and Tailscale’s free plan covers the web address. Plaid’s free plan connects up to 10 banks for the whole laptop, and a bank you disconnect still counts toward the 10. The only running cost is the electricity for a laptop that’s on all the time.</p></details>
+    <details><summary>Where does my data live?</summary><p>On your laptop, in a folder called <span class="mono">data/</span>. Banks connect through your own Plaid account, so bank data goes from Plaid straight to your laptop and never to us. Bank connections are stored encrypted, and Budget It can read balances and transactions but can’t move money.</p></details>
+    <details><summary>Do I have to connect a bank?</summary><p>No. You can import a CSV from your bank’s website, or add an account by hand and keep its balance up to date. You can also look around with sample data first and remove it in one tap.</p></details>
+    <details><summary>Which banks work?</summary><p>The banks Plaid supports in Canada and the US. For any other bank, use CSV import or keep the account by hand.</p></details>
+    <details><summary>Is it ready for my real money?</summary><p>Budget It is new. It has been tested with Plaid’s test bank, and not yet with real banks, so expect a rough edge or two and please report what you find. It only ever reads your accounts.</p></details>
+    <details><summary>Can the people I live with use it too?</summary><p>Yes. Invite them with a link. Each person gets a private budget, and whoever runs the laptop sees people and health but never anyone’s accounts, charges or budgets.</p></details>
+    <details><summary>What if the laptop is off?</summary><p>The app is down until it’s back on, and your phone still shows your last numbers. Nothing is lost, because everything is saved on the laptop.</p></details>
+  </div>
+</section>
+
+<footer>
+  <span><b>Budget It</b> · Free and open source · MIT licence · Also from Budget It: <a href="https://splitit.budgetit.ca/">Split It</a></span>
+  <span>AI tools were used to help build this project, including its code and artwork. If you own something shown here and want it removed, <a href="https://github.com/sherrypanaich/Budget-it/issues/new">open an issue on GitHub</a> and we’ll take it down.</span>
+</footer>
+</div>
+
+<script>
+(function(){
+  // Count only your share: what stays in your budget and what housemates owe back.
+  const paid = document.getElementById('paid'), out = document.getElementById('parsed'), ppl = document.querySelectorAll('.people button');
+  const money = c => '$' + (c / 100).toFixed(2);
+  let n = 3;
+  function render(){
+    const v = Number(String(paid.value).replace(/[$,\s]/g, '')), cents = Math.round(v * 100);
+    if(!isFinite(v) || cents <= 0){ out.innerHTML = '<span class="none">Type an amount, like 90</span>'; return; }
+    const mine = Math.round(cents / n), back = cents - mine;
+    out.innerHTML = '<span class="amt"><b>Stays in Groceries</b>' + money(mine) + '</span><span><b>Owed back by housemates</b>' + money(back) + '</span>';
+  }
+  paid.addEventListener('input', render);
+  ppl.forEach(b => b.addEventListener('click', () => { n = Number(b.dataset.n); ppl.forEach(x => x.setAttribute('aria-pressed', x === b)); render(); }));
+  render();
+
+  // donation amount picker
+  const tiers = document.querySelectorAll('.tier'), dBtn = document.getElementById('donateBtn');
+  tiers.forEach(t => t.addEventListener('click', () => { tiers.forEach(x => x.setAttribute('aria-pressed', x === t)); dBtn.textContent = 'Donate $' + t.dataset.amt; }));
+
+  // copy install commands
+  const cb = document.getElementById('copyBtn');
+  cb.addEventListener('click', () => {
+    const txt = document.getElementById('cmds').innerText.split('\n').filter(l => l.startsWith('$ ')).map(l => l.slice(2)).join('\n');
+    const done = () => { cb.textContent = 'Copied'; setTimeout(() => cb.textContent = 'Copy', 1600); };
+    const fail = () => { cb.textContent = 'Select and copy'; };
+    if(navigator.clipboard) navigator.clipboard.writeText(txt).then(done, fail); else fail();
+  });
+})();
+</script>
+
+</body>
+</html>

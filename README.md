@@ -1,9 +1,10 @@
 # Budget it
 
-**Your whole money picture, on a laptop you already own.** A free, open source [Budget It](https://sherrypanaich.github.io/split-it/) project, alongside [Split it](https://github.com/sherrypanaich/split-it).
+**Your whole money picture, on a laptop you already own.** A free, open source [Budget It](https://budgetit.ca/) project, alongside [Split it](https://github.com/sherrypanaich/split-it).
 
 Budget it brings your bank accounts together, sorts your spending, and keeps a monthly budget for each kind of spending: groceries, dining out, home and bills, and so on. It finds your bills and subscriptions, tracks savings goals, and nudges your phone before a budget runs out. Your budget is stored on your own machine, with no ads and no tracking. Banks connect through [Plaid](https://plaid.com), read only. "Where your data goes" below says exactly who sees what.
 
+- Website: https://budgetit.ca/
 - Support it: https://github.com/sponsors/sherrypanaich
 - Licence: MIT (see `LICENSE`). Character art is not covered by the licence, see "Character art" below.
 - What's new: `CHANGELOG.md`
@@ -14,6 +15,7 @@ What's in this repo:
 - `plaid.js` talks to Plaid. `budget.js` and `ops.js` are the money rules, shared by the server and the page.
 - `accounts.js` (sign-in) and `push.js` (phone notifications) are the same files Split it uses, word for word.
 - `public/` is the app page and sign-in pages.
+- `docs/` is the website at budgetit.ca, served by GitHub Pages.
 - `data/` is created on first run and never committed. It holds `db.json` (budgets, transactions and encrypted bank connections), `users.json` (sign-ins), `secret.key` (unlocks the bank connections), `oauth.json` (AI assistants), `push.json` and `push-keys.json` (phone notifications), `receipts/`, and `backups/` (a copy of `db.json` every day for 30 days, and every Sunday for a year).
 - `test/` checks the money rules and runs the whole server against a stand-in Plaid. `node --test test/*.test.js` runs it; `install.sh` runs it for you.
 - `Dockerfile` and `compose.yaml` if you'd rather run it in a container (`docker compose up -d`, then `docker compose exec budget-it node server.js add-user YOU`). The app runs as an ordinary user inside the container, not root.
