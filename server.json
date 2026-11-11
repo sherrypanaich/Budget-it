@@ -1,0 +1,31 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.sherrypanaich/budget-it",
+  "title": "Budget it",
+  "description": "Self-hosted household budget: spending, budgets, bills and accounts, synced with Plaid",
+  "version": "1.1.0",
+  "websiteUrl": "https://budgetit.ca",
+  "repository": {
+    "url": "https://github.com/sherrypanaich/Budget-it",
+    "source": "github"
+  },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/sherrypanaich/Budget-it/main/public/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": ["512x512"]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://{address}/mcp",
+      "variables": {
+        "address": {
+          "description": "The web address of your own Budget it server, without https:// (for example home.example.com)",
+          "isRequired": true
+        }
+      }
+    }
+  ]
+}
