@@ -1,5 +1,17 @@
 # What's new in Budget it
 
+## v1.1.0 · Draft, not released yet
+
+**Connect your own AI assistant.** Everyone using Budget it can now link Claude, Muse or ChatGPT to their own budget from the app, and see or disconnect what's linked.
+
+### New
+- Settings has a new **AI assistants** page: your connector link with a Copy button, steps for adding it to Claude, and a list of the assistants and keys that act as you, with when each was last used.
+- Make your own key for an assistant that asks for an API key or bearer token, right in the app. It's shown once, and only works as you.
+- Disconnect one assistant, or all of them, with a tap. The Accounts page links here too.
+
+### Security
+- Keys and sign-ins are only ever listed and removed by the person they belong to. The list never shows a key itself.
+
 ## v1.0.0 · November 9, 2026
 
 **Meet Budget it: your whole money picture, kept on your own laptop.** Connect your banks, set a budget for each kind of spending, and let Luffy or Hancock tell you how the month is going. Your budget is stored on your own machine, with no ads and no tracking.

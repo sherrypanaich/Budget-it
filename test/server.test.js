@@ -365,3 +365,55 @@ test('the assistant’s tools answer plainly even with odd arguments', async () 
     assert.doesNotMatch(text, /Cannot read|is not a function|undefined|NaN|\[object Object\]/, `${t.name} ${JSON.stringify(args)}: ${text}`);
   }
 });
+
+test('each person links their own assistants from the app, and only they can disconnect them', async () => {
+  const tools = key => req('POST', '/mcp', { jsonrpc: '2.0', id: 1, method: 'tools/list' }, '', { Authorization: 'Bearer ' + key, Accept: 'application/json, text/event-stream' });
+  assert.equal((await req('GET', '/api/assistants', undefined, '')).status, 401, 'needs a sign-in');
+  let r = await req('GET', '/api/assistants');
+  assert.equal(r.status, 200);
+  assert.match(r.body.url, /\/mcp$/);
+  const before = r.body.list.length;
+
+  // a key made in the app works on /mcp and acts as its person
+  r = await req('POST', '/api/assistants/key', { name: '  Muse   on my phone ' });
+  assert.equal(r.status, 200);
+  const key = r.body.key;
+  assert.match(key, /^bik_/);
+  assert.equal((await tools(key)).status, 200);
+  const list = (await req('GET', '/api/assistants')).body.list;
+  assert.equal(list.length, before + 1);
+  const row = list.find(x => x.name === 'Muse on my phone');
+  assert.equal(row.kind, 'key');
+  assert.ok(row.used > 0, 'it shows when it was last used');
+  assert.ok(!JSON.stringify(list).includes(key.slice(4)), 'the list never shows the key itself');
+
+  // an assistant connected by signing in (what Claude does) shows up under its own name
+  const crypto = require('crypto');
+  const reg = await req('POST', '/oauth/register', { client_name: 'Claude', redirect_uris: ['https://claude.ai/api/mcp/auth_callback'] }, '');
+  const verifier = crypto.randomBytes(32).toString('base64url'), challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
+  const q = { response_type: 'code', client_id: reg.body.client_id, redirect_uri: 'https://claude.ai/api/mcp/auth_callback', state: 's', code_challenge: challenge, code_challenge_method: 'S256' };
+  const back = await fetch(base + '/oauth/authorize', { method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ ...q, name: 'Mika', password: 'password456' }) });
+  const code = new URL(back.headers.get('location')).searchParams.get('code');
+  const tok = await (await fetch(base + '/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'authorization_code', code, code_verifier: verifier, client_id: reg.body.client_id, redirect_uri: q.redirect_uri }) })).json();
+  assert.equal((await tools(tok.access_token)).status, 200);
+  const mika = (await req('GET', '/api/assistants', undefined, other)).body.list;
+  const claude = mika.find(x => x.name === 'Claude');
+  assert.equal(claude.kind, 'app');
+  assert.ok(!mika.some(x => x.name === 'Muse on my phone'), 'Mika sees only her own');
+
+  // someone else can't disconnect yours
+  r = await req('POST', '/api/assistants/remove', { id: row.id }, other);
+  assert.equal(r.body.removed, 0);
+  assert.equal((await tools(key)).status, 200);
+  // you can
+  r = await req('POST', '/api/assistants/remove', { id: row.id });
+  assert.equal(r.body.removed, 1);
+  assert.equal((await tools(key)).status, 401);
+  // disconnecting Claude ends both its access and its refresh
+  r = await req('POST', '/api/assistants/remove', { id: claude.id }, other);
+  assert.equal(r.body.removed, 2);
+  assert.equal((await tools(tok.access_token)).status, 401);
+  const again = await fetch(base + '/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: tok.refresh_token, client_id: reg.body.client_id }) });
+  assert.equal(again.status, 400);
+  assert.equal((await req('POST', '/api/assistants/remove', {})).status, 400);
+});
