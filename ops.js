@@ -30,7 +30,7 @@
         if (a.note !== undefined) t.note = text(a.note, 140);
         if (a.tags !== undefined) { const tg = tagsOf(a.tags); if (tg.length) t.tags = tg; else delete t.tags; }
         if (a.hidden !== undefined) { if (a.hidden) t.hidden = true; else delete t.hidden; }
-        t.fresh = false;
+        t.fresh = false; delete t.changed;   // saving it is checking it, after the bank changed its amount
         if (a.rule) addRule(s, B.ruleName(t.m), t.c);
         return a.rule ? `Saved. ${B.ruleName(t.m)} goes in ${B.catName(t.c)} from now on.` : a.hidden ? 'Hidden. It won’t count in your totals.' : 'Saved';
       },
@@ -168,7 +168,10 @@
       'income.set'(s, a) { const v = num(a.amount); if (!(v >= 0)) bad('Enter an amount.'); s.expectIncome = v; return 'Saved'; },
       'account.share'(s, a) {
         const x = s.accounts.find(y => y.id === a.id) || bad('That account isn’t there any more.');
-        x.shared = !!a.shared; return x.shared ? 'Shared with the household' : 'Only you can see it now';
+        // `with`: the people (their ids) who can see it. The server keeps only people who are really here and says who.
+        // `shared: true/false` is the older all-or-nobody switch.
+        x.shared = Array.isArray(a.with) ? [...new Set(a.with.map(v => text(v, 40)).filter(Boolean))].slice(0, 50) : !!a.shared;
+        return x.shared === true || (x.shared && x.shared.length) ? 'Shared' : 'Only you can see it now';
       },
       // Accounts you keep by hand (no bank connection): cash, a credit union Plaid can't reach, a loan.
       'account.add'(s, a) {
@@ -190,8 +193,10 @@
       },
       'account.delete'(s, a) {
         const x = s.accounts.find(y => y.id === a.id && !y.other) || bad('That account isn’t there any more.');
-        if (!x.manual && !x.csv) bad('Disconnect the bank to remove this account.');
+        // A bank account goes only once its bank is disconnected ("Delete this history")
+        if (!x.manual && !x.csv && !x.disconnected) bad('Disconnect the bank to remove this account.');
         const n = s.txns.filter(t => t.acct === x.id).length;
+        for (const t of s.txns) if (t.acct === x.id) unpair(s, t);
         s.accounts = s.accounts.filter(y => y !== x); s.txns = s.txns.filter(t => t.acct !== x.id);
         s.goals.forEach(g => { if (g.acct === x.id) { g.saved = Math.max(0, x.bal || 0); delete g.acct; } });
         return `Removed ${x.name}${n ? ` and its ${n} transaction${n === 1 ? '' : 's'}` : ''}`;

@@ -393,10 +393,13 @@
 
   // ---------- export ----------
   function toCsv(st) {
-    const q = v => { v = String(v ?? ''); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    const q = v => { v = String(v ?? ''); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    // Text that starts like a formula (= + - @, a tab or a return) gets a ' in front, so a spreadsheet shows it
+    // instead of running it. Amounts are numbers and stay as they are.
+    const w = v => { v = String(v ?? ''); return /^[=+\-@\t\r]/.test(v) ? "'" + v : v; };
     const acc = id => ((st.accounts || []).find(a => a.id === id) || { name: id === 'cash' ? 'Cash' : id }).name;
     const rows = mine(st).concat((st.txns || []).filter(t => t.hidden && !t.other)).sort((a, b) => a.date.localeCompare(b.date));
-    return ['Date,Description,Amount,Category,Account,Note,Tags,Counted'].concat(rows.map(t => [t.date, t.m, t.a.toFixed(2), catName(t.c), acc(t.acct), t.note || '', (t.tags || []).join(' '), t.hidden ? 'no' : 'yes'].map(q).join(','))).join('\n') + '\n';
+    return ['Date,Description,Amount,Category,Account,Note,Tags,Counted'].concat(rows.map(t => [t.date, w(t.m), t.a.toFixed(2), w(catName(t.c)), w(acc(t.acct)), w(t.note || ''), w((t.tags || []).join(' ')), t.hidden ? 'no' : 'yes'].map(q).join(','))).join('\n') + '\n';
   }
 
   // Top places money went this month, leaving out home & bills and transfers.

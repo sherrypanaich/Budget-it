@@ -59,7 +59,8 @@ const post = body => fetch('/api/join', { method:'POST', headers:{'Content-Type'
   const r = await post({}).catch(() => null);
   const d = r ? await r.json().catch(() => ({})) : {};
   if (!r || !r.ok) { lead.innerHTML = (d.error || 'Couldn’t check this invite.') + ' Already have an account? <a href="/login">Sign in</a>.'; return; }
-  lead.textContent = `${d.from} invited you to Budget it. Pick a name and password to join. Your budget and banks stay private to you.`;
+  lead.textContent = `${d.from} invited you to Budget it. Pick a name and password to join, and you’re friends with ${d.from} right away. Your budget and banks stay private to you.`;
+  if (d.waiting && d.waiting.name) document.getElementById('n').value = d.waiting.name;   // a name the invite was made for, if any
   fields.hidden = false; document.getElementById('n').focus();
   if (d.google) { document.getElementById('gBox').hidden = false; document.getElementById('gJoin').href = '/auth/google?mode=join&invite=' + encodeURIComponent(token); }
 })();

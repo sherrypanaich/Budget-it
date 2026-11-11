@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('http');
+const net = require('net');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -95,18 +96,28 @@ test.before(async () => {
   env.FX_URL = `http://127.0.0.1:${fx.address().port}`;
   await new Promise(ok => gh.listen(0, '127.0.0.1', ok)); gh.unref();
   env.RELEASES_URL = `http://127.0.0.1:${gh.address().port}/latest`;
+  await new Promise(ok => fakeSplit.listen(0, '127.0.0.1', ok));
+  env.SPLIT_IT_URL = `http://127.0.0.1:${fakeSplit.address().port}`;   // a Split it on this laptop has to be named
   cli(['add-user', 'Sherry'], 'password123\n');
   cli(['add-user', 'Mika'], 'password456\n');
-  const port = 20000 + Math.floor(Math.random() * 20000);
-  env.PORT = String(port); base = `http://127.0.0.1:${port}`;
-  srv = spawn(process.execPath, [SERVER], { env, stdio: ['ignore', 'pipe', 'pipe'] });
-  await new Promise((ok, no) => { srv.stdout.on('data', d => /running at/.test(d) && ok()); srv.stderr.on('data', d => process.stderr.write(d)); srv.on('exit', c => no(new Error('server exited ' + c))); });
+  // A port the system says is free right now (a random guess sometimes hit one in use, the server stopped, and the
+  // clean-up then waited forever for it). Something else can still take it in the moment before the server does: then another one.
+  for (let tries = 1; ; tries++) {
+    const port = await new Promise(ok => { const s = net.createServer().listen(0, '127.0.0.1', () => { const n = s.address().port; s.close(() => ok(n)); }); });
+    env.PORT = String(port); base = `http://127.0.0.1:${port}`;
+    srv = spawn(process.execPath, [SERVER], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const up = await new Promise((ok, no) => { let out = '';
+      srv.stdout.on('data', d => { out += d; if (/running at/.test(out)) ok(true); }); srv.stderr.on('data', d => { out += d; if (!/already in use/.test(d)) process.stderr.write(d); });
+      srv.once('close', c => /already in use/.test(out) && tries < 5 ? ok(false) : no(new Error('server exited ' + c))); });
+    if (up) break;
+  }
   cookie = await login('Sherry', 'password123');
   other = await login('mika', 'password456');
 });
 test.after(async () => {
   // the server writes its files once more as it stops, so wait for it before deleting the folder
-  if (srv) { const gone = new Promise(ok => srv.on('exit', ok)); srv.kill(); await gone; }
+  // when it already stopped (it failed to start), its 'exit' came and went: waiting for another one hung the run forever
+  if (srv && srv.exitCode === null && srv.signalCode === null) { const gone = new Promise(ok => srv.once('exit', ok)); srv.kill(); await gone; }
   fake.close(); boc.close(); fx.close();
   fs.rmSync(DATA, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   fs.rmSync(COPIES, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
@@ -192,12 +203,23 @@ test('a pending charge that posts keeps your changes', async () => {
   assert.equal(ubers[0].note, 'Night out');
 });
 
-test('shared accounts show to the household, read only; the rest stay private', async () => {
+test('an account is shared with the people you pick, read only; everyone else sees nothing', async () => {
+  cli(['add-user', 'Jo'], 'password789\n');
+  const jo = await login('jo', 'password789');
   let m = (await req('GET', '/api/state', undefined, other)).body.state;
   assert.equal(m.accounts.length, 0);
   assert.equal(m.txns.length, 0);
-  await req('POST', '/api/op', { op: 'account.share', args: { id: 'p_cc', shared: true } });
+  const people = (await req('GET', '/api/state')).body.people;
+  assert.deepEqual(people.map(p => p.name).sort(), ['Jo', 'Mika']);
+  const mika = people.find(p => p.name === 'Mika').id, joId = people.find(p => p.name === 'Jo').id;
+  const sh = await op('account.share', { id: 'p_cc', with: [mika, 'u_nobody', (await req('GET', '/api/state')).body.me.id] });
+  assert.equal(sh.body.msg, 'Shared with Mika');
+  assert.deepEqual(sh.body.state.accounts.find(a => a.id === 'p_cc').shared, [mika], 'only real people, never yourself');
+  const joSees = (await req('GET', '/api/state', undefined, jo)).body.state;
+  assert.equal(joSees.accounts.length, 0, 'Jo has a login but the card is shared only with Mika');
+  assert.equal(joSees.txns.length, 0);
   m = (await req('GET', '/api/state', undefined, other)).body.state;
+  assert.equal(m.accounts[0].shared, undefined, 'Mika doesn’t see who else it is shared with');
   assert.equal(m.accounts.length, 1);
   assert.equal(m.accounts[0].other, true);
   assert.equal(m.accounts[0].owner, 'Sherry');
@@ -205,6 +227,12 @@ test('shared accounts show to the household, read only; the rest stay private', 
   const theirs = m.txns[0];
   const r = await op('txn.update', { id: theirs.id, c: 'fun' }, other);
   assert.equal(r.status, 400);
+  // the older all-or-nobody switch still works: on means everyone here, by name
+  const all = await op('account.share', { id: 'p_cc', shared: true });
+  assert.deepEqual([...all.body.state.accounts.find(a => a.id === 'p_cc').shared].sort(), [mika, joId].sort());
+  assert.equal((await req('GET', '/api/state', undefined, jo)).body.state.accounts.length, 1);
+  await op('account.share', { id: 'p_cc', with: [mika] });
+  assert.equal((await req('GET', '/api/state', undefined, jo)).body.state.accounts.length, 0);
 });
 
 test('a bank that wants you to sign in again shows Reconnect', async () => {
@@ -243,13 +271,22 @@ test('the AI assistant (MCP) can read and change the budget with a key', async (
   assert.match(sum.result.content[0].text, /Groceries/);
 });
 
-test('disconnecting a bank removes it here and at Plaid', async () => {
+test('disconnecting a bank removes it at Plaid and keeps its history here', async () => {
   const items = (await req('GET', '/api/state')).body.items;
   const r = await req('POST', '/api/plaid/remove', { item: items[0].id });
   assert.equal(r.status, 200);
   assert.equal(r.body.items.length, 0);
-  assert.equal(r.body.state.accounts.filter(a => a.id.startsWith('p_')).length, 0);
+  const kept = r.body.state.accounts.filter(a => a.id.startsWith('p_'));
+  assert.ok(kept.length >= 4 && kept.every(a => a.disconnected && a.disconnectedOn === today));
+  assert.ok(r.body.state.txns.some(t => t.plaidId === 't1'), 'its transactions stay');
   assert.ok(calls.some(c => c.path === '/item/remove'));
+  await new Promise(ok => setTimeout(ok, 1500));
+  assert.equal(JSON.parse(fs.readFileSync(path.join(DATA, 'db.json'), 'utf8')).items[items[0].id], undefined, 'the sealed access token is gone');
+  // "Delete this history" removes one for good
+  const del = await op('account.delete', { id: 'p_chk' });
+  assert.equal(del.status, 200, JSON.stringify(del.body));
+  assert.ok(!del.body.state.accounts.some(a => a.id === 'p_chk'));
+  assert.ok(!del.body.state.txns.some(t => t.acct === 'p_chk'));
 });
 
 test('invite links work once', async () => {
@@ -275,7 +312,6 @@ const fakeSplit = http.createServer((req, res) => {
 });
 
 test('export, receipts and Send to Split it', async () => {
-  await new Promise(ok => fakeSplit.listen(0, '127.0.0.1', ok));
   try {
     let r = await op('txn.add', { amount: 54.2, m: 'Loblaws', c: 'groceries', date: today });
     const t = r.body.state.txns.find(x => x.m === 'Loblaws' && x.manual);
@@ -338,7 +374,7 @@ test('the assistant’s newer tools: bills, safe to spend, month report, budgets
   const rr = (await req('GET', '/api/state')).body.state.accounts.find(a => a.name === 'RRSP');
   await op('holding.save', { acct: rr.id, sym: 'XEQT', qty: 10, price: 30 });
   x = await call('update_price', { symbol: 'xeqt', price: 33.5 });
-  assert.match(x.content[0].text, /XEQT now \$33\.50 in RRSP, which is worth \$335\.00/);
+  assert.match(x.content[0].text, /XEQT now 33\.50 CAD in "RRSP", which is worth 335\.00 CAD/, 'it says the currency');
   assert.match((await call('update_price', { symbol: 'nope', price: 1 })).content[0].text, /You have: XEQT/);
 });
 

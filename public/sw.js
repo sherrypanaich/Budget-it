@@ -1,7 +1,7 @@
 // Budget it service worker: lets phones install the app, keeps a copy of the app and the
 // latest data so it opens away from wifi, and shows notifications.
 const SHELL = 'budget-it-shell-v1', DATA = 'budget-it-data-v1';
-const PRECACHE = ['/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/budget.js'];
+const PRECACHE = ['/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/budget.js', '/qr.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(PRECACHE).catch(() => {}))); self.skipWaiting(); });
 self.addEventListener('activate', e => e.waitUntil((async () => {
   for (const k of await caches.keys()) if (k !== SHELL && k !== DATA) await caches.delete(k);
@@ -40,7 +40,7 @@ self.addEventListener('fetch', e => {
     })());
     return;
   }
-  if (url.pathname === '/budget.js') return e.respondWith(networkFirst(req, SHELL));
+  if (url.pathname === '/budget.js' || url.pathname === '/qr.js') return e.respondWith(networkFirst(req, SHELL));
   if (/^\/(art\/|icon|apple-touch-icon|manifest\.webmanifest)/.test(url.pathname)) return e.respondWith(staleWhileRevalidate(req, SHELL));
   if (READ_API.test(url.pathname + url.search)) return e.respondWith(networkFirst(req, DATA));
 });

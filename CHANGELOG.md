@@ -2,15 +2,71 @@
 
 ## v1.1.0 · Draft, not released yet
 
-**Connect your own AI assistant.** Everyone using Budget it can now link Claude, Muse or ChatGPT to their own budget from the app, and see or disconnect what's linked.
+**Safer to run, kinder to your history.** Disconnecting a bank no longer throws away its history, one person's wrong passwords no longer lock everyone out, a full disk no longer stops the app, and you can connect your own AI assistant from Settings.
+
+### Highlights
+- **Your history stays.** Disconnect a bank and its accounts, charges and your edits stay put. Reconnect it and the history carries on with no doubles.
+- **Built for running behind Coolify and Cloudflare.** Each visitor gets their own wrong-password limit, and changes sent from other websites are refused.
+- **Find your people.** Everyone gets an @tag, a friend link with a QR code, and accounts can be shared with the people you pick instead of everyone here.
+- **Connect your own AI assistant.** Link Claude, Muse or ChatGPT from Settings, with one tap if you're already signed in, and make read-only keys.
 
 ### New
-- Settings has a new **AI assistants** page: your connector link with a Copy button, steps for adding it to Claude, and a list of the assistants and keys that act as you, with when each was last used.
-- Make your own key for an assistant that asks for an API key or bearer token, right in the app. It's shown once, and only works as you.
-- Disconnect one assistant, or all of them, with a tap. The Accounts page links here too.
+- Settings has a new **AI assistants** page: your connector link with a Copy button, steps for adding it to Claude, and a list of the assistants and keys that act as you, with when each was last used. Make your own key there (it's shown once), tick **Read only** for an assistant that should only look, and disconnect one or all of them with a tap.
+- One-tap Allow: if you're already signed in to Budget it in that browser, connecting an assistant takes one tap. This also fixes the dead end for people who signed up with Google and have no password. The page shows where access goes ("Budget it sends access to: claude.ai").
+- `node server.js mcp-key NAME --read-only` makes a read-only key on the laptop.
+- **People and friends** in Settings: your own @tag (change it any time), find someone already on Budget it by their exact @tag or checked email and send a friend request, your friend link with a QR code ("Make a new link" turns the old one off), and your open invite links and requests with Cancel.
+- Share an account with the people you pick: the account sheet has a checkbox for each person, friends first. Accounts that were shared with everyone stay shared with the people who were here, and someone who joins later doesn't see them.
+- Disconnecting a bank keeps its history. Its accounts show "Disconnected · history kept", and "Delete this history" removes it for good if you really want it gone.
+- Reconnecting a bank carries its old accounts on, matched by bank, kind of account and last 4 digits. Charges that come back again are matched so nothing is doubled, and your categories, notes, tags, splits and receipts stay.
+- When a bank needs you to sign in again, your phone gets one notification and it shows under "Needs you" with a Reconnect button.
+- If a charge changes after you split it (a tip added when it posts), it's flagged under "Needs you": "<Store> changed from $X to $Y after you split it."
+- Settings, **Your data**: download a copy of your own data, or delete your data and your account (you type your name to confirm).
+- Extra safety copies of your budgets: one at every start (so every update has one) and one every 6 hours, on top of the daily and weekly ones.
+- If the budgets file was damaged at start, whoever runs Budget it sees which copy was used and its date, until they dismiss it.
+- Restore also takes a plain `db-….json` copy from `data/backups`.
+
+### Improved
+- New bank connections ask for up to two years of history (was 180 days). Only the last 14 days land in "New from your bank".
+- Each bank shows when it was last updated.
+- Before a new bank connection on Plaid's production plan, Budget it says how many of your 10 connections are left, and that removing a bank doesn't give one back.
+- A change you made offline that the laptop refuses is now shown to you instead of vanishing, and a change that keeps failing is set aside after 3 tries so the rest still go through.
+- Signing out clears the phone's saved copy of your budget and any unsent changes (it asks first).
+- A sign-in you keep using stays signed in: 90 days from the last day you used it, not from the day you signed in.
+- Signing in through a link, including Google, returns you to where you were going.
+- After a change, your assistant names the currency, and every tool that changes something tells the assistant to check with you first.
+- When you send a charge to Split it, Budget it reads your share from Split it's numbers when Split it sends them.
+- Backups written to a file are written as they go, one receipt photo at a time, so a big backup doesn't need a lot of memory.
+- The owner's page warns from 90% disk full.
+- With no Plaid keys, Home's "Get started" puts "Add an account by hand" first. The README now starts with CSV import and accounts by hand, with Plaid as the extra, and explains `PLAID_REDIRECT_URI`, the 10-connection limit, and trying Sandbox first.
+- The README has a new "Running behind a proxy (Coolify, Traefik, Cloudflare tunnel)" section and a "Restoring a backup from the terminal" section for files over Cloudflare's 100 MB upload limit.
+- New settings: `TZ` (reminders and "today" follow it; the Docker image now includes time zones), `TRUSTED_PROXY`, and `SPLIT_IT_URL`.
+- The website and README say what it costs to run: about $70 a month for Budget it and Split it together, and linking bank accounts costs extra on top of that.
+
+### Fixed
+- Behind a proxy (Coolify, Traefik, a Cloudflare tunnel), five wrong passwords from anyone locked everyone out of signing in for 15 minutes. Each visitor now has their own limit.
+- Someone guessing at your name can no longer lock you out; your sign-in just slows down for a bit.
+- After about 500 apps registered, no new AI assistant could ever connect. Apps that never finished signing in are now cleared after a day.
+- An assistant that retried after a slow reply could add the same cash purchase or goal twice. The same add within 2 minutes is now answered "Already added a moment ago".
+- A full or failing disk no longer stops the app. The change that couldn't be saved says so, it's retried, and the owner sees a warning.
+- Restore checks every file before replacing anything, so a wrong file can't break the app.
+- A test that hung now and then is fixed.
 
 ### Security
-- Keys and sign-ins are only ever listed and removed by the person they belong to. The list never shows a key itself.
+- Changes sent to Budget it from another website are refused.
+- Sign-in tokens are stored hashed, so a copied backup can't be used to sign in. Existing sign-ins keep working.
+- Changing your email needs your current password or a sign-in code.
+- The Split it address can no longer be used to make the laptop call things on its own network. Set `SPLIT_IT_URL` for a Split it on the same laptop or home network.
+- Copies off the laptop leave out the bank key until `BACKUP_PASSPHRASE` is set, and the owner's page says so.
+- A damaged or unreadable bank key stops the app with a clear message instead of being replaced, which would have broken every bank connection.
+- Assistant keys and sign-ins unused for 90 days stop working (sign-ins used to last a year). One address can register at most 20 assistant apps an hour.
+- Names and notes from people and banks are passed to assistants as quoted data, never as instructions.
+- CSV exports can't carry spreadsheet formulas.
+- A shared account was visible to every login on the laptop. Now only the people you picked see it.
+- The README and website say exactly who sees what: Plaid sees the bank data it fetches, a connected assistant sees what it asks for, Cloudflare carries the traffic if you use a tunnel, and whoever runs the laptop can read everything.
+
+### Known issues
+- Anyone using a Split it on the same laptop (like `http://localhost:8080`) needs to add `SPLIT_IT_URL` to `budget-it.env` and restart; the error message says what to add.
+- A disconnected bank's last balance still counts in net worth.
 
 ## v1.0.0 · November 9, 2026
 

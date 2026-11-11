@@ -14,6 +14,7 @@ const path = require('path');
 const SERVER = path.join(__dirname, '..', 'server.js');
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'budget-it-safety-'));
 const DATA = path.join(DIR, 'data'), COPIES = path.join(DIR, 'copies');
+process.env.DATA_DIR = path.join(DIR, 'here');   // for require('../server.js') in this process: never the repo's own data folder
 const PASS = 'correct horse battery';
 let PORT, proc, env, addr = 0;
 const plaidCalls = [], splitCalls = [];
@@ -101,28 +102,35 @@ before(async () => {
   env = { ...process.env, DATA_DIR: DATA, PORT: String(PORT), HOST: '127.0.0.1', BACKUP_COPY_DIR: COPIES, BACKUP_PASSPHRASE: PASS, UPDATE_CHECK: 'off', RESEND_API_KEY: '', GOOGLE_CLIENT_ID: '', PUBLIC_URL: '',
     PLAID_CLIENT_ID: 'id', PLAID_SECRET: 'secret', PLAID_ENV: 'production', PLAID_URL: `http://127.0.0.1:${await listen(fakePlaid)}`, PLAID_REDIRECT_URI: 'https://budget.example.test/plaid/return',
     FX_URL: `http://127.0.0.1:${await listen(fakeFx)}`, BOC_URL: 'http://127.0.0.1:9' };
-  await listen(fakeSplit);
+  env.SPLIT_IT_URL = `http://127.0.0.1:${await listen(fakeSplit)}`;   // a Split it on this laptop has to be named
   for (const n of ['Ana', 'Ben']) assert.match(cli(['add-user', n], n.toLowerCase() + '-password\n'), /Added/);
-  proc = spawn(process.execPath, [SERVER], { env, stdio: ['ignore', 'pipe', 'pipe'] });
-  await new Promise((res, rej) => { let out = ''; const t = setTimeout(() => rej(new Error('server did not start: ' + out)), 15000);
-    const on = d => { out += d; if (/running at/.test(out)) { clearTimeout(t); res(); } }; proc.stdout.on('data', on); proc.stderr.on('data', on); proc.on('exit', c => rej(new Error('server stopped early (' + c + '): ' + out))); });
+  for (let tries = 1; ; tries++) {   // another program can take the free port in the moment before the server does: then another one
+    if (tries > 1) env.PORT = String(PORT = await freePort());
+    proc = spawn(process.execPath, [SERVER], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const up = await new Promise((res, rej) => { let out = ''; const t = setTimeout(() => rej(new Error('server did not start: ' + out)), 15000);
+      const on = d => { out += d; if (/running at/.test(out)) { clearTimeout(t); res(true); } }; proc.stdout.on('data', on); proc.stderr.on('data', on);
+      proc.once('close', c => { clearTimeout(t); if (/already in use/.test(out) && tries < 5) res(false); else rej(new Error('server stopped early (' + c + '): ' + out)); }); });
+    if (up) break;
+  }
   ana = await as('Ana'); ben = await as('Ben');
 });
 after(async () => {
-  if (proc) { const gone = new Promise(r => proc.on('exit', r)); proc.kill(); await gone; }
+  if (proc && proc.exitCode === null && proc.signalCode === null) { const gone = new Promise(r => proc.once('exit', r)); proc.kill(); await gone; }   // never wait for an exit that already happened
   for (const s of [fakePlaid, fakeSplit, fakeFx]) s.close();
   fs.rmSync(DIR, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 });
 
 // ---------- signing in ----------
-test('wrong passwords are limited per address and per account', async () => {
+test('wrong passwords lock out an address, and only slow an account down', async () => {
   const b = browser('10.70.0.1');
   for (let i = 0; i < 5; i++) assert.equal((await b.signIn('Ben', 'wrong-guess-' + i)).status, 401);
   assert.equal((await b.signIn('Ben', 'ben-password')).status, 429, 'that address waits, even with the right password');
   assert.equal((await browser('10.70.0.2').signIn('Ben', 'ben-password')).status, 200);
   assert.match(cli(['add-user', 'Target'], 'target-password\n'), /Added/);
   for (let i = 0; i < 10; i++) assert.equal((await browser(`10.71.0.${i + 1}`).signIn('Target', 'wrong-guess-' + i)).status, 401);
-  assert.equal((await browser('10.71.1.1').signIn('Target', 'target-password')).status, 429, 'ten misses lock the account from anywhere');
+  const t0 = Date.now();
+  assert.equal((await browser('10.71.1.1').signIn('Target', 'target-password')).status, 200, 'ten misses from anywhere never lock the account');
+  assert.ok(Date.now() - t0 >= 900, 'but its sign-in waits a moment first');
   assert.equal((await browser('10.71.1.2').signIn('Ana', 'ana-password')).status, 200, 'other people still get in');
 });
 
@@ -214,7 +222,8 @@ test('a backup can be locked with a passphrase, and comes back whole', async () 
   assert.equal(locked.status, 200); assert.equal(locked.buf.subarray(0, 5).toString(), 'BIBK1');
   assert.ok(!locked.buf.includes('Kept Coffee') && !locked.buf.includes('db.json'), 'nothing readable inside');
   const plain = await ana.get('/api/admin/backup');
-  assert.equal(plain.buf.readUInt32LE(0), 0x04034b50); assert.ok(plain.buf.includes('secret.key'), 'a plain zip holds the key to the bank connections, which is why locking matters');
+  assert.equal(plain.buf.readUInt32LE(0), 0x04034b50);
+  assert.equal('secret.key' in require('../server.js').zipRead(plain.buf), fs.existsSync(path.join(DATA, 'secret.key')), 'a downloaded zip holds the key to the bank connections, which is why locking matters');
 
   await ana.op('txn.add', { amount: 99, m: 'Added Later', c: 'shopping' });
   fs.rmSync(path.join(DATA, 'receipts', receipt));
