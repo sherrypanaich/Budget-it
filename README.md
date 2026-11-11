@@ -1,6 +1,6 @@
 # Budget it
 
-**Your whole money picture, on a laptop you already own.** A free, open source [Budget It](https://budgetit.ca/) project, alongside [Split it](https://github.com/sherrypanaich/split-it).
+**Your whole money picture, on a laptop you already own.** A free, open source [Budget It](https://budgetit.ca/) project, alongside [Split it](https://splitit.budgetit.ca/).
 
 Budget it brings your bank accounts together, sorts your spending, and keeps a monthly budget for each kind of spending: groceries, dining out, home and bills, and so on. It finds your bills and subscriptions, tracks savings goals, and nudges your phone before a budget runs out. Your budget is stored on your own machine, with no ads and no tracking. Start with a CSV from your bank's website or accounts you keep by hand; if you have [Plaid](https://plaid.com) keys, banks can also connect by themselves, read only. "Where your data goes" below says exactly who sees what.
 
@@ -17,8 +17,9 @@ What's in this repo:
 - `public/` is the app page and sign-in pages.
 - `docs/` is the website at budgetit.ca, served by GitHub Pages.
 - `data/` is created on first run and never committed. It holds `db.json` (budgets, transactions and encrypted bank connections), `users.json` (sign-ins), `secret.key` (unlocks the bank connections), `oauth.json` (AI assistants), `push.json` and `push-keys.json` (phone notifications), `receipts/`, and `backups/` (copies of `db.json`: one at every start, one every 6 hours for two days, one a day for 30 days, and one every Sunday for a year).
-- `test/` checks the money rules and runs the whole server against a stand-in Plaid. `node --test test/*.test.js` runs it; `install.sh` runs it for you.
-- `Dockerfile` and `compose.yaml` if you'd rather run it in a container (`docker compose up -d`, then `docker compose exec budget-it node server.js add-user YOU`). The app runs as an ordinary user inside the container, not root.
+- `test/` checks the money rules and runs the whole server against a stand-in Plaid, and opens a data folder made by Budget it 1.0 (`test/fixtures/`) to check that updating keeps everything. `node --test test/*.test.js` runs it; `install.sh` runs it for you.
+- `scripts/smoke-docker.sh` builds the Docker image and checks it on a real Docker host (sign in, restart, data and time zone still right). The release workflow runs it.
+- `Dockerfile` and `compose.yaml` if you'd rather run it in a container (see "With Docker instead" below). `install.sh` and `budget-it.service` are for the plain install.
 
 ## Quick install
 
@@ -30,7 +31,21 @@ cd budget-it
 bash install.sh
 ```
 
-It installs Node.js if needed, copies the app to `~/budget-it`, and starts it on boot at port 8090 (Split it uses 8080, so both can run on the same laptop). Then do steps 3 and 4 below. Running it again later (after `git pull`) updates the app and keeps your data and settings.
+It installs Node.js if needed, copies the app to `~/budget-it`, and starts it on boot at port 8090 (Split it uses 8080, so both can run on the same laptop). Run it as yourself, not with `sudo`: it asks for your password when it needs it. Then do steps 3 and 4 below.
+
+**Updating.** `git pull`, then `bash install.sh` again. It updates the app and keeps your `data/` folder and `budget-it.env`. Coming from 1.0, everyone stays signed in, assistant keys keep working, and an account that was shared with everyone stays shared with the people who were here.
+
+**With Docker instead** (or Coolify, which builds `compose.yaml` for you):
+
+```
+git clone https://github.com/sherrypanaich/budget-it
+cd budget-it
+cp budget-it.env.example budget-it.env      # your settings; fill in what you use later
+docker compose up -d                        # change TZ in compose.yaml to your time zone first
+docker compose exec budget-it node server.js add-user YOURNAME
+```
+
+Then open http://localhost:8090 and carry on at step 4. Your data lives in the `budget-it-data` volume, so `git pull && docker compose up -d --build` updates the app and keeps it. Inside the container the app runs as an ordinary user, not root.
 
 ## 1. Install Node.js (once)
 
@@ -88,7 +103,7 @@ Keep these keys on the laptop. Don't paste them into a chat, an email or GitHub.
 2. In `budget-it.env`, put it in `PLAID_SECRET` and set `PLAID_ENV=production`. Restart.
 3. Connect your banks in the app. Budget it covers Canada and the US by default (`PLAID_COUNTRIES=CA,US`). A new connection asks for up to two years of history; banks send what they have.
 
-Three things to know about the free plan:
+Four things to know about the free plan:
 
 - **It allows 10 bank connections, for good, for everyone on the laptop together.** Each bank a person connects uses one. The Connect a bank screen and the owner's page show how many are used, and Budget it asks you to confirm before each new one ("This uses 1 of your 10 free bank connections; 7 left").
 - **Disconnecting a bank does not give its connection back.** If a bank stops updating, use Reconnect on it. Don't remove it and add it again, because that uses another one.
@@ -264,9 +279,22 @@ Your budget lives in `data/` on your laptop. Budget it has no server of its own 
 - Share an account: open it on the Accounts page and tick the people who can see it. They see its balance and charges, read only, and it doesn't count toward their budgets. Nobody else does. (An account shared with everyone before 1.1 stays shared with the people who were here then.)
 - Other currencies: totals are in CAD unless you change it in Settings, Currencies. Get today's rates works for any home currency.
 
+## All the settings
+
+They go in `budget-it.env` next to `server.js` (with Docker, next to `compose.yaml`), one `NAME=value` per line, then restart. `budget-it.env.example` has every one with a longer note. An empty line is the same as leaving it out.
+
+- **Banks:** `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV` (`sandbox` or `production`), `PLAID_COUNTRIES` (`CA,US`), `PLAID_REDIRECT_URI`, `PLAID_ITEM_LIMIT` (10, or 0 to stop counting), `SYNC_HOURS` (6). See step 4.
+- **The bank key:** `BUDGET_IT_KEY`, only if you'd rather not have `data/secret.key`. Keep a copy: without it the bank connections can't be read.
+- **Backups:** `BACKUP_COPY_DIR` and `BACKUP_PASSPHRASE`. See Backups.
+- **Sign-in extras:** `PUBLIC_URL` (your https address), `RESEND_API_KEY` and `MAIL_FROM` (emails), `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (Continue with Google).
+- **Behind a proxy or in a container:** `TZ`, `TRUSTED_PROXY`, `SPLIT_IT_URL`. See "Running behind a proxy".
+- **Where it runs (plain install):** `PORT` (8090), `HOST` (`127.0.0.1`, this computer only), `DATA_DIR` (`data/` next to `server.js`). The Docker image sets these itself.
+- **Other:** `UPDATE_CHECK=off` stops the owner's page asking GitHub for the newest version. `PUSH_CONTACT` is a `mailto:` address sent to the phone push services, in case they need to reach whoever runs it.
+- **Only for the tests:** `PLAID_URL`, `RESEND_URL`, `GOOGLE_AUTH_URL`, `GOOGLE_TOKEN_URL`, `BOC_URL`, `FX_URL` and `RELEASES_URL` point Budget it at stand-ins. Leave them out.
+
 ## Character art
 
-The guide characters in `public/art/` are not covered by the MIT licence and may not be reused. If you own something shown here and want it removed, [open an issue](https://github.com/sherrypanaich/budget-it/issues/new) and we'll take it down.
+The guide characters in `public/art/` are not covered by the MIT licence and may not be reused. If you own something shown here and want it removed, [open an issue](https://github.com/sherrypanaich/Budget-it/issues/new) and we'll take it down.
 
 ## Made with AI
 

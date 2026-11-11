@@ -262,7 +262,7 @@ test('a change made offline that the laptop refuses is shown, and one that keeps
   const ctx = vm.createContext({
     store: { get: k => mem[k] === undefined ? null : JSON.parse(mem[k]), set: (k, v) => { mem[k] = JSON.stringify(v); } },
     navigator: { onLine: true }, LAPTOP: true, VIEW: { me: { id: 'u_me' } }, location: {},
-    fetch: async (url, o) => { const b = JSON.parse(o.body); sent.push(b.op + ':' + (b.args && b.args.n)); const a = answer(b); if (a.offline) throw new Error('offline'); return { ok: a.status < 300, status: a.status, json: async () => a.body }; },
+    fetch: async (url, o) => { const b = JSON.parse(o.body); sent.push(b.op + ':' + (b.args && b.args.n)); const a = answer(b); if (a.offline) throw new Error('offline'); return { ok: a.status < 300, status: a.status, headers: { get: () => a.type || 'application/json' }, json: async () => a.body }; },
     refresh: async () => {}, toast: m => toasts.push(m), sheet: h => shown.push(h), close: () => {}, esc: x => String(x),
     document: { getElementById: () => ({ innerHTML: '' }) } });
   vm.runInContext(code + '\n;this.flushQueue = flushQueue;', ctx);
@@ -292,4 +292,13 @@ test('a change made offline that the laptop refuses is shown, and one that keeps
   sent.length = 0; q([{ op: 'txn.add', args: { n: 6 }, uid: 'u_me', tries: 0 }]); answer = () => ({ offline: true });
   await ctx.flushQueue();
   assert.equal(JSON.parse(mem['bi-queue'])[0].tries, 0);
+  // the laptop is off or asleep, and the tunnel in front of it answers with its own error page: not a try either
+  answer = () => ({ status: 502, type: 'text/html', body: null });
+  for (let i = 0; i < 4; i++) await ctx.flushQueue();
+  assert.equal(JSON.parse(mem['bi-queue'])[0].tries, 0); assert.equal(JSON.parse(mem['bi-aside']).length, 1, 'nothing more set aside');
+  // each change carries its own id, so one sent again after a lost answer is saved once
+  answer = () => ({ status: 200, body: { ok: true } }); let ids = [];
+  ctx.fetch = async (url, o) => { ids.push(JSON.parse(o.body).qid); return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => ({ ok: true }) }; };
+  q([{ op: 'txn.add', args: { n: 7 }, uid: 'u_me', tries: 0, qid: 'abc123' }]); await ctx.flushQueue();
+  assert.deepEqual(ids, ['abc123']);
 });

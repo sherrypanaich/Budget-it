@@ -23,6 +23,13 @@ jobs:
         run: |
           awk -v v="## ${VERSION} " 'index($0, v) == 1 {on=1; next} /^## v/ {if (on) exit} on' CHANGELOG.md > notes.md
           test -s notes.md || { echo "No section for ${VERSION} in CHANGELOG.md"; exit 1; }
+      - name: Docker smoke test (build, start, add a person, sign in, restart, data and time zone still right)
+        run: |
+          if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
+            scripts/smoke-docker.sh
+          else
+            echo "::warning::Docker is not available on this runner, so the Docker smoke test was skipped"
+          fi
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}

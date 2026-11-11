@@ -1,8 +1,15 @@
 // Budget it service worker: lets phones install the app, keeps a copy of the app and the
 // latest data so it opens away from wifi, and shows notifications.
-const SHELL = 'budget-it-shell-v1', DATA = 'budget-it-data-v1';
-const PRECACHE = ['/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/budget.js', '/qr.js'];
-self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(PRECACHE).catch(() => {}))); self.skipWaiting(); });
+// The page and its code are always asked for fresh first, so an update reaches phones on their next open;
+// these copies are only for when the laptop can't be reached. A new name here drops the old copies.
+const SHELL = 'budget-it-shell-v2', DATA = 'budget-it-data-v1';
+// The page's own code too (ops.js makes changes offline): without it a phone opened offline can't change anything
+const CODE = ['/budget.js', '/ops.js', '/sample.js', '/qr.js'];
+const PRECACHE = ['/manifest.webmanifest', '/icon-192.png', '/icon-512.png', ...CODE];
+// The page too, so a phone that goes offline right after the first visit still opens it. Only the app itself:
+// signed out, '/' is a redirect to the sign-in page, and that's never kept as the app.
+const keepPage = c => fetch('/', { credentials: 'same-origin' }).then(r => cacheable(r) && c.put('/', r)).catch(() => {});
+self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => Promise.all([...PRECACHE.map(u => c.add(u).catch(() => {})), keepPage(c)]))); self.skipWaiting(); });
 self.addEventListener('activate', e => e.waitUntil((async () => {
   for (const k of await caches.keys()) if (k !== SHELL && k !== DATA) await caches.delete(k);
   await self.clients.claim();
@@ -17,11 +24,16 @@ const OFFLINE = `<!doctype html><meta charset="utf-8"><meta name="viewport" cont
 
 const cacheable = r => r && r.ok && !r.redirected && r.type === 'basic';
 const fromCache = r => { if (!r) return r; const h = new Headers(r.headers); h.set('X-From-Cache', '1'); return new Response(r.body, { status: r.status, statusText: r.statusText, headers: h }); };
-// Network first, remember the answer, fall back to the remembered one.
+// Network first, remember the answer, fall back to the remembered one. A 5xx page that isn't the app's own
+// (the tunnel's "502 Bad Gateway" while the laptop is off or asleep) counts as not reaching it.
+const unreachable = r => r.status >= 500 && !/json/.test(r.headers.get('content-type') || '');
 async function networkFirst(req, cacheName, key) {
   const c = await caches.open(cacheName);
-  try { const r = await fetch(req); if (cacheable(r)) c.put(key || req, r.clone()); return r; }
-  catch (e) { const hit = await c.match(key || req); if (hit) return fromCache(hit); throw e; }
+  try {
+    const r = await fetch(req); if (cacheable(r)) c.put(key || req, r.clone());
+    if (unreachable(r)) { const hit = await c.match(key || req); if (hit) return fromCache(hit); }
+    return r;
+  } catch (e) { const hit = await c.match(key || req); if (hit) return fromCache(hit); throw e; }
 }
 // Serve what we have, refresh it quietly for next time.
 async function staleWhileRevalidate(req, cacheName) {
@@ -35,12 +47,13 @@ self.addEventListener('fetch', e => {
   if (url.origin !== self.location.origin || req.method !== 'GET') return;
   if (req.mode === 'navigate') {
     e.respondWith((async () => {
-      try { return await networkFirst(req, SHELL, url.pathname === '/' || url.pathname === '/index.html' ? '/' : undefined); }
-      catch { return (await caches.match('/')) || new Response(OFFLINE, { headers: { 'Content-Type': 'text/html; charset=utf-8' } }); }
+      const offline = () => new Response(OFFLINE, { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+      try { const r = await networkFirst(req, SHELL, url.pathname === '/' || url.pathname === '/index.html' ? '/' : undefined); return unreachable(r) ? offline() : r; }
+      catch { return (await caches.match('/')) || offline(); }
     })());
     return;
   }
-  if (url.pathname === '/budget.js' || url.pathname === '/qr.js') return e.respondWith(networkFirst(req, SHELL));
+  if (CODE.includes(url.pathname)) return e.respondWith(networkFirst(req, SHELL));
   if (/^\/(art\/|icon|apple-touch-icon|manifest\.webmanifest)/.test(url.pathname)) return e.respondWith(staleWhileRevalidate(req, SHELL));
   if (READ_API.test(url.pathname + url.search)) return e.respondWith(networkFirst(req, DATA));
 });
@@ -56,6 +69,12 @@ self.addEventListener('push', e => {
     body: m.body || '', tag: m.tag, renotify: !!m.tag, icon: '/icon-192.png', badge: '/icon-192.png', data: { url: m.url || '/' }
   }));
 });
+
+// The browser renewed this phone's subscription: tell the laptop the new one (the old one is dropped when it's refused).
+self.addEventListener('pushsubscriptionchange', e => e.waitUntil((async () => {
+  const sub = e.newSubscription || (e.oldSubscription && await self.registration.pushManager.subscribe(e.oldSubscription.options));
+  if (sub) await fetch('/api/push/subscribe', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...sub.toJSON(), quiet: true }) });
+})().catch(() => {})));
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();

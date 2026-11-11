@@ -22,7 +22,8 @@ services:
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
-    # Put your Plaid keys and other settings in budget-it.env next to this file (see budget-it.env.example)
+    # Put your Plaid keys and other settings in budget-it.env next to this file (see budget-it.env.example).
+    # "required: false" needs Docker Compose 2.24 or newer; on an older one, delete those two lines and keep "- budget-it.env".
     env_file:
       - path: budget-it.env
         required: false

@@ -38,6 +38,9 @@ module.exports = function makeMcp(h) {
     let m = 0; try { m = fs.statSync(FILE).mtimeMs; } catch {}
     if (m !== loadedAt) { try { store = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { store = {}; } loadedAt = m; }
     store.clients = store.clients || {}; store.codes = store.codes || {}; store.tokens = store.tokens || {}; store.forms = store.forms || {};
+    // Budget it 1.0 never noted when a key was used (oauth.json from it, or from a backup it made): its idle clock
+    // starts now, or every key made more than IDLE_DAYS ago would stop working at the upgrade, however often it's used.
+    if (!store.usedNoted) { let n = 0; for (const t of Object.values(store.tokens)) if (t.kind === 'key' && !t.used) { t.used = Date.now(); n++; } store.usedNoted = true; if (n) saveStore(); }
   };
   const saveStore = () => { const t = FILE + '.tmp'; fs.writeFileSync(t, JSON.stringify(store), { mode: 0o600 }); fs.renameSync(t, FILE); try { loadedAt = fs.statSync(FILE).mtimeMs; } catch {} };
   fresh();
@@ -326,12 +329,51 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
 
   // ---------- reading and changing Budget it ----------
   const B = h.B;
-  const $ = n => (n < 0 ? '-' : '') + '$' + Math.abs(n).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // The home currency of the person a tool runs for, set just before each call. Home money shows as $12.00 when
+  // it's CAD (each answer then says CAD once) and as 12.00 EUR otherwise, so a euro budget never reads as dollars.
+  let HOME = 'CAD';
+  const $ = n => HOME !== 'CAD' ? cur$(n, HOME) : (n < 0 ? '-' : '') + '$' + Math.abs(n).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const cur$ = (n, c) => c ? (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + c : $(n);
-  const ymArg = (v, t) => /^\d{4}-\d\d$/.test(v || '') ? v : B.ymOf(t);
+  const $home = n => $(n) + (HOME === 'CAD' ? ' CAD' : '');   // home money next to money in another currency
+  // What assistants send is often text ("12.50", "$1,200", "yesterday", "last month"). It becomes what the app takes,
+  // or a clear error: never a quiet guess ("12,50" isn't 1,250, and "next summer" isn't today).
+  const amountArg = (v, name = 'amount') => {
+    const n = typeof v === 'number' ? v : /^\s*-?\s*\$?\s*(\d{1,3}(,\d{3})+|\d+)?(\.\d+)?\s*$/.test(String(v ?? '')) && /\d/.test(String(v)) ? +String(v).replace(/[$,\s]/g, '') : NaN;
+    if (!isFinite(n)) throw new Error(/,\d{1,2}\s*$/.test(String(v)) ? `${name} has to be a number with a dot for cents: 12.50, not 12,50.` : `${name} has to be a number, like 12.50.`);
+    return n;
+  };
+  const shiftDay = (d, n) => new Date(Date.parse(d + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+  const dayArg = (v, name = 'date') => {
+    const x = norm(v), t = h.today();
+    if (!x || x === 'today') return t;
+    if (x === 'yesterday') return shiftDay(t, -1);
+    if (/^\d{4}-\d\d-\d\d$/.test(x) && B.toDate(x) === x) { if (x > t) throw new Error(`${name} can’t be after today (${t}).`); return x; }
+    throw new Error(`${name} has to be a day like ${t}, or “today” or “yesterday”.`);
+  };
+  const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  // A month: 2026-11, "this month", "last month", "next month" or a name ("October", "Oct 2025"). A name without a
+  // year is the latest one so far, or with ahead the next one (for a goal's end).
+  const monthArg = (v, def, name = 'month', ahead = false) => {
+    const x = norm(v), now = B.ymOf(h.today());
+    if (!x) return def;
+    if (x === 'this month') return now;
+    if (x === 'last month' || x === 'previous month') return B.prevYm(now);
+    if (x === 'next month') return B.nextYm(now);
+    if (/^\d{4}-(0[1-9]|1[0-2])(-\d\d)?$/.test(x)) return x.slice(0, 7);
+    const m = /^([a-z]{3,})\.?,?(?: (\d{4}))?$/.exec(x), i = m ? MONTHS.findIndex(n => n.startsWith(m[1])) : -1;
+    if (i >= 0) {
+      const mm = String(i + 1).padStart(2, '0'), y = +now.slice(0, 4);
+      if (m[2]) return m[2] + '-' + mm;
+      return ahead ? (`${y}-${mm}` >= now ? `${y}-${mm}` : `${y + 1}-${mm}`) : (`${y}-${mm}` <= now ? `${y}-${mm}` : `${y - 1}-${mm}`);
+    }
+    throw new Error(`${name} has to be a month like ${now}, or “this month”, “last month” or a month’s name.`);
+  };
+  const MONTH_HELP = 'YYYY-MM, or “this month”, “last month” or a month’s name like “October”.';
+  const ymArg = (v, t) => monthArg(v, B.ymOf(t));
   const findCat = v => { const x = String(v || '').toLowerCase().trim(); if (!x) return undefined; return B.CATS.find(c => c.id === x || c.name.toLowerCase() === x || c.name.toLowerCase().startsWith(x))?.id; };
-  const catList = () => 'One of: ' + B.CATS.map(c => `${c.id} (${c.name})`).join(', ') + '.';
-  const CAT_HELP = 'One of: ' + B.CATS.map(c => `${c.id} (${c.name})`).join(', ') + '.';
+  // The person's own categories (B.CATS follows whoever's state was read last), by id or name
+  const catList = spending => 'One of: ' + B.CATS.filter(c => !spending || !B.NOT_SPENDING.includes(c.id)).map(c => `${c.id} (${c.name})`).join(', ') + '.';
+  const CAT_HELP = catList(), SPEND_HELP = catList(true);   // tools/list swaps these for the person's own list
   // Text people and banks wrote (charge names, notes, Split it group text, rule and goal names) goes out in quotes, so the assistant
   // can tell it apart from what Budget it says. JSON quoting keeps a quote or a new line inside from breaking out.
   const said = v => JSON.stringify(String(v ?? '').slice(0, 200));
@@ -342,50 +384,50 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
   const norm = v => String(v ?? '').toLowerCase().trim().replace(/\s+/g, ' ');
   const tools = [
     { name: 'get_balances', title: 'Balances and net worth', annotations: { readOnlyHint: true },
-      description: 'Shows each account the person has in Budget it (bank accounts from Plaid, imported and shared accounts) with its balance, and their net worth. Credit cards show what is owed. Investment accounts list their holdings with value and gain.',
+      description: 'Shows each of the person’s own accounts in Budget it (from their banks through Plaid, imported or added by hand) with its balance, and their net worth. Accounts someone else shares with them are left out. Credit cards show what is owed. Investment accounts list their holdings with value and gain. Says the home currency.',
       inputSchema: { type: 'object', properties: {} },
       run(uid) {
         const s = h.stateOf(uid);
         if (!s.accounts.length) return 'No accounts yet. Connect a bank in the Budget it app (Accounts, Connect a bank), or import a CSV.';
         const nw = s.accounts.reduce((x, a) => x + B.inHome(s, a), 0), home = B.homeCur(s), miss = B.missingRates(s);
-        const inCur = a => a.cur && B.rate(s, a.cur) ? ` (about ${$(Math.abs(B.inHome(s, a)))} ${home})` : '';
-        const held = a => { const h = B.holdings(a); if (!h.list.length) return '';
-          return `\n  Holdings${h.gain !== null ? ` (${h.gain >= 0 ? 'up' : 'down'} ${$(Math.abs(h.gain))}, ${Math.abs(h.pct)}%)` : ''}: ` + h.list.map(x => `${x.sym || said(x.name)} ${+x.qty.toFixed(4)} x ${$(x.price)} = ${$(x.value)}${x.gain !== null ? ` (${x.gain >= 0 ? '+' : '-'}${Math.abs(x.pct)}%)` : ''}`).join('; '); };
-        return s.accounts.map(a => `${said(a.name)} (${said(a.inst)}${a.mask ? ' ···' + a.mask : ''}, ${a.type}): ${a.bal < 0 ? cur$(-a.bal, a.cur) + inCur(a) + ' owing' : cur$(a.bal, a.cur) + inCur(a)}${held(a)}`).join('\n') + `\n\nNet worth: ${$(nw)}${home !== 'CAD' || s.accounts.some(a => a.cur) ? ' ' + home : ''}${miss.length ? ` (no rate set for ${miss.join(', ')}, counted 1 to 1)` : ''}` + (() => { const w = B.worthSeries(s); return w.length > 1 ? `\nNet worth by month: ${w.slice(-6).map(x => `${x.ym} ${$(x.v)}`).join(', ')}` : ''; })();
+        const inCur = a => a.cur && B.rate(s, a.cur) ? ` (about ${$home(Math.abs(B.inHome(s, a)))})` : '';
+        const held = a => { const h = B.holdings(a), c$ = n => cur$(n, a.cur); if (!h.list.length) return '';   // in the account's own currency
+          return `\n  Holdings${h.gain !== null ? ` (${h.gain >= 0 ? 'up' : 'down'} ${c$(Math.abs(h.gain))}, ${Math.abs(h.pct)}%)` : ''}: ` + h.list.map(x => `${x.sym || said(x.name)} ${+x.qty.toFixed(4)} x ${c$(x.price)} = ${c$(x.value)}${x.gain !== null ? ` (${x.gain >= 0 ? '+' : '-'}${Math.abs(x.pct)}%)` : ''}`).join('; '); };
+        return s.accounts.map(a => `${said(a.name)} (${said(a.inst)}${a.mask ? ' ···' + a.mask : ''}, ${a.type}): ${a.bal < 0 ? cur$(-a.bal, a.cur) + inCur(a) + ' owing' : cur$(a.bal, a.cur) + inCur(a)}${held(a)}`).join('\n') + `\n\nNet worth: ${$home(nw)}${miss.length ? ` (no rate set for ${miss.join(', ')}, counted 1 to 1)` : ''}` + (() => { const w = B.worthSeries(s); return w.length > 1 ? `\nNet worth by month: ${w.slice(-6).map(x => `${x.ym} ${$(x.v)}`).join(', ')}` : ''; })();
       } },
     { name: 'list_transactions', title: 'Find transactions', annotations: { readOnlyHint: true },
-      description: 'Lists transactions newest first. Filter by month (YYYY-MM), category, or text in the name or note; search "#japan" finds a tag in every month. Each line starts with an id you can pass to set_category. Hidden ones say so and do not count in totals.',
-      inputSchema: { type: 'object', properties: { month: { type: 'string', description: 'YYYY-MM. Leave out for the last 60 days.' }, category: { type: 'string', description: CAT_HELP }, search: { type: 'string' }, limit: { type: 'integer', minimum: 1, maximum: 200, default: 40 } } },
+      description: 'Lists the person’s transactions newest first, in the home currency (one from a foreign account also shows what it was in that currency). Filter by month, category (id or name), or text in the name or note, or an amount like 64.20; search "#japan" finds a tag in every month. Each line starts with an id you can pass to set_category. Hidden ones say so and do not count in totals.',
+      inputSchema: { type: 'object', properties: { month: { type: 'string', description: MONTH_HELP + ' Leave out for the last 60 days.' }, category: { type: 'string', description: CAT_HELP }, search: { type: 'string' }, limit: { type: 'integer', minimum: 1, maximum: 200, default: 40 } } },
       run(uid, a) {
-        const s = h.stateOf(uid), t = h.today(), c = a.category ? findCat(a.category) : null;
+        const s = h.stateOf(uid), t = h.today(), c = a.category ? findCat(a.category) : null, ym = monthArg(a.month, null);
         if (a.category && !c) throw new Error('Unknown category. ' + catList());
-        const since = B.ymd(new Date(Date.now() - 60 * 864e5)), q = String(a.search || '').toLowerCase();
+        const since = shiftDay(t, -60), q = String(a.search || '').toLowerCase().trim();
         const tag = q.startsWith('#') ? q.slice(1) : null;
-        let list = s.txns.filter(x => (a.month ? B.ymOf(x.date) === a.month : tag || x.date >= since) && (!c || x.c === c) && (!q || (tag ? (x.tags || []).includes(tag) : x.m.toLowerCase().includes(q) || (x.note || '').toLowerCase().includes(q) || (/^\$?\d+(\.\d+)?$/.test(q) && Math.abs(x.a).toFixed(2).includes(q.replace('$', ''))))));
+        let list = s.txns.filter(x => (ym ? B.ymOf(x.date) === ym : tag || x.date >= since) && (!c || x.c === c) && (!q || (tag ? (x.tags || []).includes(tag) : x.m.toLowerCase().includes(q) || (x.note || '').toLowerCase().includes(q) || (/^\$?\d+(\.\d+)?$/.test(q) && Math.abs(x.a).toFixed(2).includes(q.replace('$', ''))))));
         list.sort((x, y) => y.date.localeCompare(x.date));
-        const n = list.length; list = list.slice(0, Math.min(200, a.limit || 40));
-        if (!n) return 'No transactions match.';
-        return list.map(x => `${x.id} | ${x.date} | ${said(x.m)} | ${$(x.a)} | ${B.catName(x.c)}${x.pending ? ' | pending' : ''}${x.hidden ? ' | hidden, not counted' : ''}${x.tags ? ' | #' + x.tags.join(' #') : ''}${x.note ? ' | note: ' + said(x.note) : ''}`).join('\n') + (n > list.length ? `\n(${n - list.length} more not shown)` : '');
+        const n = list.length; list = list.slice(0, Math.min(200, Math.max(1, Math.round(+a.limit) || 40)));
+        if (!n) return `No transactions match${ym ? ' in ' + ym : tag ? '' : ' in the last 60 days'}.${!ym && !tag ? ' Give a month to look further back.' : ''}`;
+        return list.map(x => `${x.id} | ${x.date} | ${said(x.m)} | ${$(x.a)}${x.orig ? ` (${cur$(x.orig.a, x.orig.cur)})` : ''} | ${B.catName(x.c)}${x.pending ? ' | pending' : ''}${x.hidden ? ' | hidden, not counted' : ''}${x.tags ? ' | #' + x.tags.join(' #') : ''}${x.note ? ' | note: ' + said(x.note) : ''}`).join('\n') + (n > list.length ? `\n(${n - list.length} more not shown)` : '');
       } },
     { name: 'spending_summary', title: 'Spending by category', annotations: { readOnlyHint: true },
       description: 'Money in, money out, and spending by category for a month (default this month), compared with the month before. Also the places that took the most money.',
-      inputSchema: { type: 'object', properties: { month: { type: 'string', description: 'YYYY-MM' } } },
+      inputSchema: { type: 'object', properties: { month: { type: 'string', description: MONTH_HELP } } },
       run(uid, a) {
         const s = h.stateOf(uid), t = h.today(), ym = ymArg(a.month, t), prev = B.prevYm(ym);
         const lines = B.CATS.filter(c => !B.NOT_SPENDING.includes(c.id)).map(c => ({ c, now: B.spent(s, c.id, ym), was: B.spent(s, c.id, prev) })).filter(x => x.now || x.was)
           .sort((x, y) => y.now - x.now).map(x => `${x.c.name}: ${$(x.now)} (${prev}: ${$(x.was)})`);
-        const top = B.topMerchants(s, ym, 5).map(m => `${said(m.name)} ${$(m.total)} in ${m.count}`).join(', ');
+        const top = B.topMerchants(s, ym, 5).map(m => `${said(m.name)} ${$(m.total)} (${m.count} charge${m.count === 1 ? '' : 's'})`).join(', ');
         return `${ym}${ym === B.ymOf(t) ? ' so far' : ''}\nMoney in: ${$(B.moneyIn(s, ym))}\nMoney out: ${$(B.moneyOut(s, ym))} (transfers left out)\n\n${lines.join('\n') || 'No spending.'}${top ? '\n\nMost money went to: ' + top : ''}`;
       } },
     { name: 'budget_status', title: 'Budgets left', annotations: { readOnlyHint: true },
       description: 'What is left in each monthly budget, how much per day that leaves for the rest of the month, and which budgets are nearly used up or over. Also upcoming bills.',
-      inputSchema: { type: 'object', properties: { month: { type: 'string', description: 'YYYY-MM' } } },
+      inputSchema: { type: 'object', properties: { month: { type: 'string', description: MONTH_HELP } } },
       run(uid, a) {
         const s = h.stateOf(uid), t = h.today(), ym = ymArg(a.month, t);
         const st = B.budgetStatus(s, ym, t);
         if (!st.length) return 'No budgets set yet. Set them in the app under Budgets.';
         const T = B.totals(s, ym);
-        const rows = st.map(b => `${b.name}: ${$(b.spent)} of ${$(b.limit)}, ${b.left >= 0 ? $(b.left) + ' left' : $(-b.left) + ' OVER'}${b.perDay != null ? ` (${$(b.perDay)}/day)` : ''}${b.state === 'near' ? ' - nearly used up' : ''}`);
+        const rows = st.map(b => `${b.name}: ${$(b.spent)} of ${$(b.limit)}, ${b.left >= 0 ? $(b.left) + ' left' : $(-b.left) + ' OVER'}${b.perDay != null && b.left > 0 ? ` (${$(b.perDay)}/day)` : ''}${b.state === 'near' ? ' - nearly used up' : ''}`);
         const bills = ym === B.ymOf(t) ? B.upcoming(s, t).filter(b => !b.paid).slice(0, 5).map(b => `${said(b.n)} ${$(b.a)} on ${b.due}`) : [];
         return `${ym}: ${$(T.left)} left of ${$(T.limit)}. ${ym === B.ymOf(t) ? `About ${$(B.perDay(s, t))} a day for everyday spending.` : ''}\n\n${rows.join('\n')}${bills.length ? '\n\nBills still to come: ' + bills.join(', ') : ''}`;
       } },
@@ -402,15 +444,18 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
       inputSchema: { type: 'object', properties: { id: { type: 'string' }, category: { type: 'string', description: CAT_HELP }, always: { type: 'boolean', default: false } }, required: ['id', 'category'] },
       run(uid, a) {
         const c = findCat(a.category); if (!c) throw new Error('Unknown category. ' + catList());
+        if (!h.stateOf(uid).txns.some(x => x.id === a.id && !x.other)) throw new Error(`No transaction has the id ${said(a.id)}. Ids are the first thing on each line of list_transactions.`);
         const msg = h.applyOp(uid, 'txn.update', { id: a.id, c, rule: !!a.always }).msg, t = h.stateOf(uid).txns.find(x => x.id === a.id);
         return t ? (a.always ? `Saved. Charges like ${said(B.ruleName(t.m))} go in ${B.catName(c)} from now on.` : `Saved. ${said(t.m)} is in ${B.catName(c)} now.`) : msg;
       } },
     { name: 'add_cash_purchase', title: 'Add a cash purchase', annotations: { destructiveHint: false },
       description: 'Adds something the person paid for in cash (or anything their bank does not show). Bank and card charges come in by themselves, so do not add those. Confirm the amount and category with the user first.',
-      inputSchema: { type: 'object', properties: { amount: { type: 'number', exclusiveMinimum: 0, description: AMOUNT }, what: { type: 'string', description: 'Where or what, e.g. "Farmers market"' }, category: { type: 'string', description: CAT_HELP + ' Leave out to guess from the name.' }, date: { type: 'string', description: 'YYYY-MM-DD, default today' }, note: { type: 'string' } }, required: ['amount', 'what'] },
+      inputSchema: { type: 'object', properties: { amount: { type: 'number', exclusiveMinimum: 0, description: AMOUNT }, what: { type: 'string', description: 'Where or what, e.g. "Farmers market"' }, category: { type: 'string', description: CAT_HELP + ' Leave out to guess from the name.' }, date: { type: 'string', description: 'YYYY-MM-DD, or “today” or “yesterday”. Default today.' }, note: { type: 'string' } }, required: ['amount', 'what'] },
       run(uid, a) {
         const c = a.category ? findCat(a.category) : null; if (a.category && !c) throw new Error('Unknown category. ' + catList());
-        h.applyOp(uid, 'txn.add', { amount: a.amount, m: a.what, c, date: a.date, note: a.note, via: 'assistant' });
+        const amount = amountArg(a.amount), date = dayArg(a.date); if (!(amount > 0)) throw new Error('amount has to be more than 0.');
+        if (!String(a.what ?? '').trim()) throw new Error('Say where or what it was, in what.');
+        h.applyOp(uid, 'txn.add', { amount, m: a.what, c, date, note: a.note, via: 'assistant' });
         const s = h.stateOf(uid), t = h.today(), added = s.txns[s.txns.length - 1], st = B.budgetStatus(s, B.ymOf(t), t).find(b => b.cat === added.c);
         return `Added ${said(added.m)}: ${money(-added.a, s)} on ${added.date}, in ${B.catName(added.c)}` + (st ? `. ${st.name} now has ${st.left >= 0 ? money(st.left, s) + ' left' : money(-st.left, s) + ' over budget'} this month.` : '.');
       } },
@@ -418,11 +463,12 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
       description: 'Records money put toward a savings goal (a negative amount takes money out). This only updates Budget it, it does not move real money. Confirm the amount with the user first.',
       inputSchema: { type: 'object', properties: { goal: { type: 'string', description: 'Goal name' }, amount: { type: 'number', description: AMOUNT } }, required: ['goal', 'amount'] },
       run(uid, a) {
-        const s = h.stateOf(uid), q = String(a.goal || '').toLowerCase();
-        const g = s.goals.find(x => x.n.toLowerCase() === q) || s.goals.find(x => x.n.toLowerCase().includes(q));
+        const s = h.stateOf(uid), q = String(a.goal || '').toLowerCase().trim();
+        const g = q ? s.goals.find(x => x.n.toLowerCase() === q) || s.goals.find(x => x.n.toLowerCase().includes(q)) : null;
         if (!g) throw new Error('No goal called that. Goals: ' + (s.goals.map(x => said(x.n)).join(', ') || 'none yet'));
-        h.applyOp(uid, 'goal.fund', { id: g.id, amount: a.amount });
-        const v = +a.amount, st = h.stateOf(uid), now = st.goals.find(x => x.id === g.id) || g;
+        const v = amountArg(a.amount); if (!v) throw new Error('amount can’t be 0.');
+        h.applyOp(uid, 'goal.fund', { id: g.id, amount: v });
+        const st = h.stateOf(uid), now = st.goals.find(x => x.id === g.id) || g;
         return `${v > 0 ? 'Added' : 'Took out'} ${money(Math.abs(v), st)} ${v > 0 ? 'to' : 'from'} ${said(now.n)} (${money(now.saved, st)} of ${money(now.target, st)} saved).`;
       } },
     { name: 'safe_to_spend', title: 'Safe to spend until payday', annotations: { readOnlyHint: true },
@@ -444,9 +490,12 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
       } },
     { name: 'year_review', title: 'Year in review', annotations: { readOnlyHint: true },
       description: 'A review of a calendar year (default this year so far): money in and out, how much was kept, spending by category, the top places, the biggest month and what subscriptions cost a year.',
-      inputSchema: { type: 'object', properties: { year: { type: 'integer', description: 'Like 2026. Default this year.' } } },
+      inputSchema: { type: 'object', properties: { year: { type: ['integer', 'string'], description: 'Like 2026, or “last year”. Default this year.' } } },
       run(uid, a) {
-        const s = h.stateOf(uid), t = h.today(), y = /^\d{4}$/.test(String(a.year || '')) ? String(a.year) : t.slice(0, 4), r = B.yearReview(s, y, t);
+        const s = h.stateOf(uid), t = h.today(), x = norm(a.year);
+        const y = !x || x === 'this year' ? t.slice(0, 4) : x === 'last year' ? String(+t.slice(0, 4) - 1) : /^\d{4}$/.test(x) ? x : null;
+        if (!y) throw new Error(`year has to be like ${t.slice(0, 4)}, or “this year” or “last year”.`);
+        const r = B.yearReview(s, y, t);
         if (!r.count) return `No spending in ${y} in Budget it yet.`;
         return [`${y}${y === t.slice(0, 4) ? ' so far' : ''}: earned ${$(r.earned)}, spent ${$(r.spent)}, kept ${$(r.kept)}${r.rate !== null ? ` (${r.rate}% of income)` : ''}.`,
           'By category: ' + r.cats.map(c => `${c.name} ${$(c.spent)}`).join(', ') + '.',
@@ -460,23 +509,27 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
       run(uid, a) {
         const s = h.stateOf(uid), debts = s.accounts.filter(x => !x.other && x.bal < 0).sort((x, y) => B.inHome(s, x) - B.inHome(s, y));
         if (!debts.length) return 'Nothing owing on any card or loan in Budget it.';
-        const acc = a.account ? debts.find(x => x.name.toLowerCase().includes(String(a.account).toLowerCase())) : debts[0];
-        if (!acc) return 'No card or loan with that name. Owing: ' + debts.map(x => x.name).join(', ') + '.';
-        const $ = n => cur$(n, acc.cur);
-        const owe = -acc.bal, apr = a.apr !== undefined ? +a.apr : acc.apr;
-        if (apr === undefined) return `${acc.name}: ${$(owe)} owing. Tell me its interest rate (APR) to work out a plan, or save it on the account in Budget it.`;
-        if (a.months) return `To clear ${acc.name} (${$(owe)} at ${apr}%) in ${a.months} months, pay ${$(B.payFor(owe, apr, a.months))} a month.`;
-        const pay = a.payment !== undefined ? +a.payment : acc.pay;
-        if (!pay) return `${acc.name}: ${$(owe)} at ${apr}%. Paying ${$(B.payFor(owe, apr, 12))} a month clears it in a year, or ${$(B.payFor(owe, apr, 6))} in 6 months.`;
+        const acc = a.account ? debts.find(x => x.name.toLowerCase().includes(String(a.account).toLowerCase().trim())) : debts[0];
+        if (!acc) return 'No card or loan with that name. Owing: ' + debts.map(x => said(x.name)).join(', ') + '.';
+        const $ = n => cur$(n, acc.cur), name = said(acc.name);   // in the card's own currency
+        const opt = (v, k) => v === undefined || v === null || v === '' ? undefined : amountArg(v, k);
+        const owe = -acc.bal, apr = opt(a.apr, 'apr') ?? acc.apr, months = opt(a.months, 'months'), pay = opt(a.payment, 'payment') ?? acc.pay;
+        if (!(apr >= 0)) return `${name}: ${$(owe)} owing. Tell me its interest rate (APR) to work out a plan, or save it on the account in Budget it.`;
+        if (months !== undefined) {
+          const n = Math.round(months); if (!(n >= 1 && n <= 600)) throw new Error('months has to be a whole number from 1 to 600.');
+          return `To clear ${name} (${$(owe)} at ${apr}%) in ${n} month${n === 1 ? '' : 's'}, pay ${$(B.payFor(owe, apr, n))} a month.`;
+        }
+        if (!(pay > 0)) return `${name}: ${$(owe)} at ${apr}%. Paying ${$(B.payFor(owe, apr, 12))} a month clears it in a year, or ${$(B.payFor(owe, apr, 6))} in 6 months.`;
         const r = B.payoff(owe, apr, pay);
-        if (r.never) return `${$(pay)} a month doesn't cover the interest on ${acc.name}. Pay at least ${$(r.minimum)} a month to start bringing it down.`;
-        return `${acc.name}: paying ${$(pay)} a month clears ${$(owe)} in ${r.months} month${r.months === 1 ? '' : 's'}, with ${$(r.interest)} of interest.`;
+        if (r.never) return `${$(pay)} a month doesn’t cover the interest on ${name}. Pay at least ${$(r.minimum)} a month to start bringing it down.`;
+        return `${name}: paying ${$(pay)} a month clears ${$(owe)} in ${r.months} month${r.months === 1 ? '' : 's'}, with ${$(r.interest)} of interest.`;
       } },
     { name: 'month_report', title: 'How did a month go', annotations: { readOnlyHint: true },
       description: 'A short report on a month (default last month): spending against budget, against a usual month, the categories that changed most, and money kept.',
-      inputSchema: { type: 'object', properties: { month: { type: 'string', description: 'YYYY-MM, default last month' } } },
+      inputSchema: { type: 'object', properties: { month: { type: 'string', description: MONTH_HELP + ' Default last month.' } } },
       run(uid, a) {
-        const s = h.stateOf(uid), t = h.today(), ym = /^\d{4}-\d\d$/.test(a.month || '') ? a.month : B.prevYm(B.ymOf(t));
+        const s = h.stateOf(uid), t = h.today(), ym = monthArg(a.month, B.prevYm(B.ymOf(t)));
+        if (!s.txns.some(x => B.ymOf(x.date) === ym)) return `No transactions in ${ym} in Budget it, so there’s nothing to report.`;
         const prior = []; let m = ym; for (let i = 0; i < 6; i++) { m = B.prevYm(m); if (s.txns.some(x => B.ymOf(x.date) === m)) prior.push(m); }
         const avg = f => prior.length ? prior.reduce((x, mm) => x + f(mm), 0) / prior.length : null;
         const out = B.moneyOut(s, ym), inc = B.moneyIn(s, ym), T = B.totals(s, ym), usual = avg(mm => B.moneyOut(s, mm));
@@ -489,27 +542,34 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
       } },
     { name: 'set_budget', title: 'Set a monthly budget', annotations: { destructiveHint: false, idempotentHint: true },
       description: 'Sets the monthly budget for a category (0 removes it). Confirm the amount with the user first.',
-      inputSchema: { type: 'object', properties: { category: { type: 'string', description: CAT_HELP }, amount: { type: 'number', minimum: 0, description: AMOUNT } }, required: ['category', 'amount'] },
-      run(uid, a) { const c = findCat(a.category); if (!c) throw new Error('Unknown category. ' + catList()); const msg = h.applyOp(uid, 'budget.set', { c, amount: a.amount }).msg;
-        return +a.amount ? `${msg} for ${B.catName(c)}: ${money(a.amount, h.stateOf(uid))} a month.` : `${msg} for ${B.catName(c)}.`; } },
+      inputSchema: { type: 'object', properties: { category: { type: 'string', description: SPEND_HELP }, amount: { type: 'number', minimum: 0, description: AMOUNT } }, required: ['category', 'amount'] },
+      run(uid, a) { const c = findCat(a.category); if (!c || B.NOT_SPENDING.includes(c)) throw new Error('Budgets are for spending categories. ' + catList(true));
+        const v = amountArg(a.amount); if (!(v >= 0)) throw new Error('amount has to be 0 or more (0 removes the budget).');
+        const msg = h.applyOp(uid, 'budget.set', { c, amount: v }).msg;
+        return v ? `${msg} for ${B.catName(c)}: ${money(v, h.stateOf(uid))} a month.` : `${msg} for ${B.catName(c)}.`; } },
     { name: 'update_price', title: 'Update a holding’s price', annotations: { destructiveHint: false, idempotentHint: true },
       description: 'Sets today’s price of one unit of a holding the person added by hand (like VFV at 135.20), which updates the account’s balance. Bank holdings update by themselves. Look the price up or ask the user. Confirm the price with the user first.',
-      inputSchema: { type: 'object', properties: { symbol: { type: 'string', description: 'The symbol or part of the name, like VFV' }, price: { type: 'number', minimum: 0, description: 'In the account’s own currency' } }, required: ['symbol', 'price'] },
+      inputSchema: { type: 'object', properties: { symbol: { type: 'string', description: 'The symbol or part of the name, like VFV' }, price: { type: 'number', exclusiveMinimum: 0, description: 'In the account’s own currency' } }, required: ['symbol', 'price'] },
       run(uid, a) {
         const s = h.stateOf(uid), q = String(a.symbol || '').toLowerCase().trim();
         const hits = s.accounts.filter(x => x.manual && !x.other).flatMap(x => (x.holdings || []).filter(y => q && ((y.sym || '').toLowerCase() === q || y.name.toLowerCase().includes(q))).map(y => [x, y]));
         if (!hits.length) { const all = s.accounts.filter(x => x.manual && !x.other).flatMap(x => (x.holdings || []).map(y => y.sym || y.name)); return all.length ? `No holding like that added by hand. You have: ${all.join(', ')}.` : 'No holdings added by hand. Holdings from a bank update by themselves.'; }
         const accts = [...new Set(hits.map(([x]) => x))];
-        for (const x of accts) h.applyOp(uid, 'holding.prices', { acct: x.id, prices: Object.fromEntries(hits.filter(([y]) => y === x).map(([, y]) => [y.id, a.price])) });
+        const price = amountArg(a.price, 'price'); if (!(price > 0)) throw new Error('price has to be more than 0.');
+        for (const x of accts) h.applyOp(uid, 'holding.prices', { acct: x.id, prices: Object.fromEntries(hits.filter(([y]) => y === x).map(([, y]) => [y.id, price])) });
         const st = h.stateOf(uid);
         const home = B.homeCur(st);
-        return accts.map(x => { const n = st.accounts.find(y => y.id === x.id); return `${hits.filter(([y]) => y === x).map(([, y]) => y.sym || said(y.name)).join(', ')} now ${cur$(+a.price, n.cur || home)} in ${said(n.name)}, which is worth ${cur$(n.bal, n.cur || home)}.`; }).join('\n');
+        return accts.map(x => { const n = st.accounts.find(y => y.id === x.id); return `${hits.filter(([y]) => y === x).map(([, y]) => y.sym || said(y.name)).join(', ')} now ${cur$(price, n.cur || home)} in ${said(n.name)}, which is worth ${cur$(n.bal, n.cur || home)}.`; }).join('\n');
       } },
     { name: 'create_goal', title: 'Create a savings goal', annotations: { destructiveHint: false },
-      description: 'Creates a savings goal with a target amount and the month to finish by (YYYY-MM). Confirm with the user first.',
-      inputSchema: { type: 'object', properties: { name: { type: 'string' }, target: { type: 'number', exclusiveMinimum: 0, description: AMOUNT }, by: { type: 'string', description: 'YYYY-MM' } }, required: ['name', 'target'] },
+      description: 'Creates a savings goal with a target amount and the month to finish by (default two months from now). Confirm with the user first.',
+      inputSchema: { type: 'object', properties: { name: { type: 'string' }, target: { type: 'number', exclusiveMinimum: 0, description: AMOUNT }, by: { type: 'string', description: 'YYYY-MM, or a month’s name like “June” (the next one). This month or later.' } }, required: ['name', 'target'] },
       run(uid, a) {
-        h.applyOp(uid, 'goal.add', { n: a.name, target: a.target, by: a.by }); const s = h.stateOf(uid), g = s.goals[s.goals.length - 1];
+        const target = amountArg(a.target, 'target'), by = monthArg(a.by, undefined, 'by', true), now = B.ymOf(h.today());
+        if (!String(a.name ?? '').trim()) throw new Error('Give the goal a name.');
+        if (!(target > 0)) throw new Error('target has to be more than 0.');
+        if (by && by < now) throw new Error(`by has to be this month (${now}) or later.`);
+        h.applyOp(uid, 'goal.add', { n: a.name, target, by }); const s = h.stateOf(uid), g = s.goals[s.goals.length - 1];
         return `Goal created: ${said(g.n)}, ${money(g.target, s)}. Put away about ${money(B.goalMonthly(g, h.today(), s), s)} a month to finish by ${g.by}.`;
       } },
     { name: 'refresh_banks', title: 'Update from banks', annotations: { destructiveHint: false, idempotentHint: true },
@@ -517,6 +577,7 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
       inputSchema: { type: 'object', properties: {} },
       async run(uid) {
         const r = await h.plaidSync(uid);
+        if (r.banks === 0) return 'No banks are connected to Budget it, so there’s nothing to update. Connect one in the app (Accounts, Connect a bank).';
         return (r.added ? `${r.added} new transaction${r.added === 1 ? '' : 's'} came in.` : 'Already up to date.') + (r.errors.length ? ' Problems: ' + r.errors.join(' ') : '');
       } },
     { name: 'undo_last_change', title: 'Undo the last change', annotations: { destructiveHint: true },
@@ -530,11 +591,12 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
   // An assistant that gets a slow reply may send the same call again. Adding the same thing for the same person
   // within 2 minutes is taken as that retry: nothing new is added. Changes that set a value (a budget, a category,
   // a price) are safe to repeat, so only the tools that add something have a `same` here.
+  const tryArg = (f, v) => { try { return f(v); } catch { return String(v); } };   // the tool itself says what's wrong
   const SAME = {
-    add_cash_purchase: (a, s) => { const date = /^\d{4}-\d\d-\d\d$/.test(a.date || '') ? a.date : h.today();
-      return { key: [norm(a.what), B.round2(+a.amount), date, 'cash'], what: `${said(String(a.what ?? '').trim())}, ${money(a.amount, s)} on ${date}` }; },
-    create_goal: (a, s) => ({ key: [norm(a.name), B.round2(+a.target), a.by || ''], what: `the goal ${said(String(a.name ?? '').trim())}, ${money(a.target, s)}` }),
-    add_to_goal: (a, s) => ({ key: [norm(a.goal), B.round2(+a.amount)], what: `${money(a.amount, s)} to ${said(String(a.goal ?? '').trim())}` })
+    add_cash_purchase: (a, s) => { const date = tryArg(dayArg, a.date);
+      return { key: [norm(a.what), tryArg(amountArg, a.amount), date, 'cash'], what: `${said(String(a.what ?? '').trim())}, ${money(tryArg(amountArg, a.amount), s)} on ${date}` }; },
+    create_goal: (a, s) => ({ key: [norm(a.name), tryArg(amountArg, a.target), a.by || ''], what: `the goal ${said(String(a.name ?? '').trim())}, ${money(tryArg(amountArg, a.target), s)}` }),
+    add_to_goal: (a, s) => ({ key: [norm(a.goal), tryArg(amountArg, a.amount)], what: `${money(tryArg(amountArg, a.amount), s)} to ${said(String(a.goal ?? '').trim())}` })
   };
   for (const t of tools) if (SAME[t.name]) t.inputSchema.properties.again = { type: 'boolean', description: 'Only when the person says this really is a second one, the same as one just added.' };
   const added = new Map();   // hash of person, tool and arguments -> { uid, at }
@@ -557,18 +619,23 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
     });
     if (method === 'ping') return ok({});
     // A read-only key or sign-in sees and calls only the tools that look.
-    if (method === 'tools/list') return ok({ tools: tools.filter(t => !ro || t.annotations.readOnlyHint).map(({ run, ...t }) => t) });
+    // The category lists in the descriptions are this person's own (renamed and added ones too).
+    if (method === 'tools/list') { h.stateOf(uid); const mineOf = v => JSON.stringify(v).slice(1, -1), cats = [[CAT_HELP, mineOf(catList())], [SPEND_HELP, mineOf(catList(true))]];
+      return ok({ tools: tools.filter(t => !ro || t.annotations.readOnlyHint).map(({ run, ...t }) => JSON.parse(cats.reduce((j, [a, b]) => j.split(mineOf(a)).join(b), JSON.stringify(t)))) }); }
     if (method === 'tools/call') {
       const t = tools.find(x => x.name === params.name);
       if (!t) return fail(-32602, 'Unknown tool: ' + params.name);
       if (ro && !t.annotations.readOnlyHint) return ok({ content: [{ type: 'text', text: 'This connection is read only, so it can’t change anything in Budget it. To allow changes, connect again without “Read only”, or make a new key in Budget it under Settings, AI assistants.' }], isError: true });
       try { const s = h.stateOf(uid);   // switches to this person's own categories
+        const home = HOME = B.homeCur(s);
         const args = params.arguments && typeof params.arguments === 'object' && !Array.isArray(params.arguments) ? params.arguments : {};
         const same = SAME[t.name] && SAME[t.name](args, s), k = same && sha(JSON.stringify([uid, t.name, same.key])), was = k && added.get(k);
         if (was && Date.now() - was.at < SAME_MS && args.again !== true) return ok({ content: [{ type: 'text', text: `Already added a moment ago: ${same.what}. Nothing new was added. If the person really means a second one, call it again with again: true.` }] });
         const out = t.run(uid, args);   // noted before waiting, so the same call twice in one batch adds once
         if (k) { for (const [x, v] of added) if (Date.now() - v.at >= SAME_MS) added.delete(x); added.set(k, { uid, at: Date.now() }); }
-        return ok({ content: [{ type: 'text', text: await out }] }); }
+        // $ amounts are Canadian dollars: an answer that doesn't say so already says it once, at the end
+        let text = String(await out); if (home === 'CAD' && /\$\d/.test(text) && !/\bCAD\b/.test(text)) text += '\n(Amounts are in CAD.)';
+        return ok({ content: [{ type: 'text', text }] }); }
       catch (e) { return ok({ content: [{ type: 'text', text: e.message }], isError: true }); }
     }
     return fail(-32601, 'Method not found: ' + method);

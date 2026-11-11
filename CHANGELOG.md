@@ -8,6 +8,7 @@
 - **Your history stays.** Disconnect a bank and its accounts, charges and your edits stay put. Reconnect it and the history carries on with no doubles.
 - **Built for running behind Coolify and Cloudflare.** Each visitor gets their own wrong-password limit, and changes sent from other websites are refused.
 - **Find your people.** Everyone gets an @tag, a friend link with a QR code, and accounts can be shared with the people you pick instead of everyone here.
+- **Faster, and works offline.** Opening a budget with years of history takes a fraction of a second, and the phone app keeps working when the laptop is asleep.
 - **Connect your own AI assistant.** Link Claude, Muse or ChatGPT from Settings, with one tap if you're already signed in, and make read-only keys.
 
 ### New
@@ -25,6 +26,10 @@
 - If the budgets file was damaged at start, whoever runs Budget it sees which copy was used and its date, until they dismiss it.
 - Restore also takes a plain `db-….json` copy from `data/backups`.
 - The owner's update check marks a security release with a red "Security update".
+- Releases are checked on a real Docker host first: build, sign in, restart, and check the data and time zone are still right.
+- The README has Docker install steps, how updating works, and a list of every setting.
+- When Budget it is updated, a page left open on your phone says "A new version of Budget it is ready" with a Reload button.
+- On an iPhone Home Screen Budget it opens like an app with its own name, and the status bar matches light and dark mode.
 
 ### Improved
 - New bank connections ask for up to two years of history (was 180 days). Only the last 14 days land in "New from your bank".
@@ -49,6 +54,17 @@
 - Picking several charges reads "Tag 3 charges" and "Move 3 charges to", the search box hint is shorter, and quotes and apostrophes are curly throughout.
 - When the laptop can't be reached, sheets say "Couldn't reach the laptop. Check your connection and try again." instead of "Failed to fetch".
 - Removing a receipt photo, and signing someone out on the owner's page, take a second tap.
+- Assistants understand "today", "yesterday", "this month", "last month", month names and "last year", and amounts written as text like "$1,200".
+- Assistants: every answer says its currency, foreign charges show their own currency too, and empty results get plain answers.
+- Assistants see your own category names, including ones you renamed or added.
+- `install.sh` refuses to run as root, keeps `budget-it.env` private on every run, installs curl if it's missing, and its self-check never uses your real settings.
+- `budget-it.env.example` lists every setting.
+- The Docker image can't change its own files, its health check follows `PORT`, and `.dockerignore` keeps tests and backups out of it.
+- Changes made offline still work after the app is reopened offline, and show straight away; the app opens offline even right after its first use.
+- When the laptop is off or asleep, the phone shows your last copy and keeps your changes until it's back, instead of an error page, and catches up by itself when it's back.
+- Changes made offline are never saved twice, even if the connection drops just as they're sent.
+- Much faster with a big budget: with 5 years and 25,000 charges, opening drops from about 3 seconds to 0.3, a 5,000-row CSV import from about a minute to under a second, and a bank update from 3 seconds to 0.3.
+- Turning on notifications sends "Notifications are on" only to that phone.
 
 ### Fixed
 - Behind a proxy (Coolify, Traefik, a Cloudflare tunnel), five wrong passwords from anyone locked everyone out of signing in for 15 minutes. Each visitor now has their own limit.
@@ -78,6 +94,22 @@
 - Invite links end when the person who sent them deletes their account.
 - A damaged or oversized backup is refused with a plain message.
 - Activity no longer scrolls sideways on a phone, the guide's speech bubble no longer covers its face on a laptop, and month names in a category's trend are no longer cut off.
+- Split it groups show by their real names, and sending works with Split it 2.2 (it puts group names in quotes).
+- Sending a charge to a Split it trip group in another currency works: Budget it says the amount is in your home currency with no card fee.
+- "Count only my share" is right when Budget it and Split it use different currencies.
+- Sending a charge again doesn't count your share twice, and a look-alike charge Split it didn't add isn't marked as sent.
+- "Send again" after "count only my share" sends the whole charge.
+- Assistants: amounts show in your own home currency, not always dollars, and holdings in their account's currency.
+- Assistants: "12,50", impossible dates, past goal dates, empty goal names and budgets for Income or Transfer are refused with a clear message instead of guessed.
+- After updating from 1.0, assistant keys older than 90 days keep working (1.0 never recorded when a key was used, so they'd have been switched off).
+- A backup taken from the terminal while the app runs includes the latest changes.
+- Laptop commands work after the app was killed or the power went out (a leftover lock file said it was still running).
+- An empty `TZ=` line no longer switches the app to UTC, and a `PORT` in `budget-it.env` is no longer overridden by the systemd service.
+- The example settings no longer set `PUBLIC_URL` to a made-up address that sent assistant sign-ins nowhere; `install.sh` clears it from existing installs.
+- SECURITY.md and README wording matches v1.1.0 (shared accounts, links).
+- Budget it reads Split it's group list from its data when Split it 2.2 sends it.
+- Notifications the laptop had lost (after a restore, or when the phone renewed them) start working again by themselves.
+- A change made offline that couldn't be saved says what it was, instead of "Saved".
 
 ### Security
 - Changes sent to Budget it from another website are refused.
@@ -98,6 +130,7 @@
 - `data/oauth.json` is readable only by the laptop's user, and a `?key=` in an assistant's link never ends up in the log.
 - Person ids like `__proto__` are refused on the owner's page and when sharing an account.
 - Friend requests and friend links notify someone at most once an hour.
+- Signing out turns off that phone's notifications and clears its cached receipt photos.
 
 ### Known issues
 - Anyone using a Split it on the same laptop (like `http://localhost:8080`) needs to add `SPLIT_IT_URL` to `budget-it.env` and restart; the error message says what to add.

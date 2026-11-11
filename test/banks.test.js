@@ -231,4 +231,17 @@ test('the share from Split it: numbers first, then the sentence', () => {
   assert.equal(myShareFrom('Added it. Your share: $30.00.', { structuredContent: { yourShare: 'lots' } }), 30);
   assert.equal(myShareFrom('Added it. Your share: $30.00.', { content: [] }), 30);
   assert.equal(myShareFrom('Something else'), null);
+  // Split it's numbers are in its home money: sent in US dollars, my part is the same fraction of what was sent
+  const usd = { amount: 30, cur: 'USD' };
+  assert.equal(myShareFrom('', { structuredContent: { yourShareCents: 1364, totalCents: 4091, currency: 'CAD' } }, usd), 10);
+  assert.equal(myShareFrom('', { structuredContent: { yourShareCents: 1364, totalCents: 4091, currency: 'CAD' } }, { amount: 40.91, cur: 'CAD' }), 13.64);
+  assert.equal(myShareFrom('Your share: $13.64.', { structuredContent: { yourShareCents: 1364, currency: 'CAD' } }, usd), null, 'no total: no fair way back, so the whole amount counts');
+  assert.equal(myShareFrom('', { structuredContent: { yourShareCents: 0, totalCents: 4091, currency: 'CAD' } }, usd), 0);
+});
+
+test('Split it’s group names, quoted (2.2) or not (older)', () => {
+  const { splitGroupsFrom } = require('../server.js');
+  assert.deepEqual(splitGroupsFrom('"House": you, Mo, Jo. You’re all square in this group.\n"Trip: \\"Lisbon\\"": you, Mo. You owe $4.00 in this group. A trip group paying in EUR (card fee 2.5%): give a currency when adding expenses.'), ['House', 'Trip: "Lisbon"']);
+  assert.deepEqual(splitGroupsFrom('House: you, Mika.\nTrip: you, Jo.'), ['House', 'Trip']);
+  assert.deepEqual(splitGroupsFrom('You’re not in any groups yet.'), []);
 });

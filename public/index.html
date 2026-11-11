@@ -3,7 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#14112A">
+<meta name="theme-color" content="#F5F1E8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121019" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Budget it">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Budget it</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -248,6 +253,7 @@ div.row{cursor:default}
 .rel ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px}
 .ver{display:inline-block;font-family:var(--mono);font-weight:700;font-size:.8rem;background:var(--ink);color:var(--bg);border-radius:6px;padding:2px 8px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tabh) + 26px + env(safe-area-inset-bottom,0px));z-index:40;background:var(--ink);color:var(--bg);border-radius:14px;border:2.5px solid var(--edge);box-shadow:3px 3px 0 var(--hl);padding:9px 9px 9px 16px;display:flex;gap:12px;align-items:center;font-weight:700;width:max-content;max-width:calc(100% - 32px)}
+.toast.newver{top:calc(12px + env(safe-area-inset-top,0px));bottom:auto;z-index:41}
 .toast button{background:var(--hl);color:var(--hl-ink);border:2px solid var(--edge);border-radius:10px;padding:5px 12px;font-weight:800}
 .foot{margin:34px 4px 0;text-align:center;font-size:.8rem;color:var(--muted)}
 @media (max-width:400px){.htext{width:calc(100% - 100px)}.hart{width:112px}.tile{padding:9px 9px}.poster{grid-template-columns:76px minmax(0,1fr)}.poster .t{font-size:1.4rem}}
@@ -423,23 +429,37 @@ const byNewest = (a, b) => b.date.localeCompare(a.date) || String(b.id).localeCo
 // ---------- data: the laptop server, or (in the preview) sample data kept in this browser ----------
 let LAPTOP = false, VIEW = null, S = null, TODAY = B.ymd(new Date()), CUR = B.ymOf(TODAY), PREV = B.prevYm(CUR);
 let demoUndo = [], DEMO_OPS = null, celebrate = null, poke = 0, PRIVATE = false;
-function setView(v) { VIEW = v; S = v.state; B.useCats(S); TODAY = v.today; CUR = B.ymOf(TODAY); PREV = B.prevYm(CUR); if (!months().includes(month)) month = CUR; }
+function setView(v) { VIEW = v; S = v.state; B.useCats(S); TODAY = v.today; CUR = B.ymOf(TODAY); PREV = B.prevYm(CUR); if (!months().includes(month)) month = CUR; if (LAPTOP) seeVersion(v.version); }
+// A page left open on a phone keeps running its old code after the laptop is updated. Once the laptop answers
+// with a newer version, offer a reload, so old code never goes on making changes to a newer budget for long.
+let PAGE_VER = null;
+function seeVersion(v) {
+  if (!v) return; if (!PAGE_VER) { PAGE_VER = v; return; }
+  if (v === PAGE_VER || document.getElementById('newVer')) return;
+  const d = document.createElement('div'); d.id = 'newVer'; d.className = 'toast newver'; d.setAttribute('role', 'status');
+  d.innerHTML = `<span>A new version of Budget it is ready (v${esc(v)}).</span><button type="button">Reload</button>`;
+  d.querySelector('button').onclick = () => location.reload();
+  document.body.appendChild(d);
+}
 const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 PRIVATE = !!store.get('bi-private');
 async function boot() {
+  let swCopy = null;
   try {
     if (window.BI_PREVIEW) throw new Error('preview');
     const r = await fetch('/api/state', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
     if (r.status === 401) { try { localStorage.removeItem('bi-view'); } catch {} try { navigator.serviceWorker?.controller?.postMessage('clear-data'); } catch {} location.href = /(?:^#|&)add=/.test(location.hash) ? '/login?next=' + encodeURIComponent('/' + location.hash) : '/login'; return; }   // a friend link waits through signing in
     if (!r.ok || !/json/.test(r.headers.get('content-type') || '')) throw new Error('no laptop');
+    // the service worker's copy, from when the laptop last answered: the one saved here can be newer (changes made offline)
+    if (r.headers.get('X-From-Cache')) { swCopy = await r.json().catch(() => null); throw new Error('offline'); }
     LAPTOP = true; setView(await r.json());
     store.set('bi-view', VIEW);
     live(); flushQueue();
     history.replaceState({ bi: 'page', tab: 'home', sub: null }, '');
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
   } catch (e) {
-    const cached = store.get('bi-view');
-    if (cached && !window.BI_PREVIEW && cached.me) { LAPTOP = true; setView(cached); toast('You’re offline. This is what you had last time.', false); }
+    const cached = store.get('bi-view') || swCopy;
+    if (cached && !window.BI_PREVIEW && cached.me) { LAPTOP = true; setView(cached); live(); toast(navigator.onLine === false ? 'You’re offline. This is what you had last time.' : 'Can’t reach the laptop right now. This is what you had last time.', false); }
     else if (!(window.BI_PREVIEW && await cloudBoot())) demoBoot();
     if (!S) return;
   }
@@ -449,8 +469,10 @@ async function boot() {
   // back from a bank's own app or site: pick the connection up where it left off
   const came = new URLSearchParams(location.search);
   if (LAPTOP && came.get('bank') === 'back') { came.delete('bank'); history.replaceState(history.state, '', '/'); openLink(null, '?' + came.toString()); }
-  if (LAPTOP && navigator.onLine !== false) { useFriendLink(); loadFriendReqs(); }
+  if (LAPTOP && navigator.onLine !== false) { useFriendLink(); loadFriendReqs(); pushCheck(); }
 }
+// Notifications on here, but the laptop lost them (a restore, or the phone renewed them while the laptop was off): add them back
+async function pushCheck() { try { const sub = await within(pushSub(), 3000); if (sub) await fetch('/api/push/subscribe', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...sub.toJSON(), quiet: true }) }); } catch {} }
 /* ---------- your own budget, saved in your Claude account (the artifact) ----------
    Everything lives in your private space: data/users/<you>/ — nobody else can read it, not even the artifact's owner.
      state            everything except transactions: { k:'s', rev, s:{accounts, budgets, rules, goals, ...} }
@@ -558,7 +580,7 @@ function queueOp(op, args, quiet) {
   LOCAL_OPS = LOCAL_OPS || window.makeBudgetOps(B, { today: () => TODAY, rid: p => p + 'q' + Math.random().toString(16).slice(2, 10), sample: window.budgetSample });
   let msg; try { msg = LOCAL_OPS.OPS[op](S, args || {}); } catch (e) { toast(e.message, false); return false; }
   // whose change it is (a phone can be shared) and what it was, in words, in case the laptop says no later
-  const qd = store.get('bi-queue') || []; qd.push({ op, args, uid: VIEW.me.id, what: msg || opWords(op), tries: 0 }); store.set('bi-queue', qd); store.set('bi-view', VIEW);
+  const qd = store.get('bi-queue') || []; qd.push({ op, args, uid: VIEW.me.id, what: msg && !/^(Saved|Done)\.?$/.test(msg) ? msg : opWords(op), tries: 0, qid: Date.now().toString(36) + Math.random().toString(36).slice(2, 10) }); store.set('bi-queue', qd); store.set('bi-view', VIEW);
   render(); if (!quiet) toast((msg ? msg + '. ' : '') + 'Saved on this phone, it goes to the laptop when you’re back online.', false);
   return true;
 }
@@ -566,6 +588,8 @@ const OP_NOUN = { txn: 'a charge', budget: 'a budget', goal: 'a goal', bill: 'a 
 const opWords = op => 'A change to ' + (OP_NOUN[String(op).split('.')[0]] || 'your budget');
 // Sends the changes made offline, in order. One the laptop refuses (say, that charge is gone now) is shown, never just dropped.
 // One that keeps failing for another reason waits a turn, and after 3 tries is set aside so it can't hold up the rest.
+// A 5xx page that isn't the app's own answer comes from the tunnel or proxy in front of it: the laptop is off or asleep.
+const unreachable = r => r.status >= 500 && !/json/.test(r.headers.get('content-type') || '');
 let flushing = false;
 async function flushQueue() {
   if (flushing || !LAPTOP || !navigator.onLine || !(store.get('bi-queue') || []).length) return;
@@ -577,9 +601,11 @@ async function flushQueue() {
     while (qd.length) {
       const x = qd[0];
       let r, j = {};
-      try { r = await fetch('/api/op', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: x.op, args: x.args }) }); j = await r.json().catch(() => ({})); }
+      // qid: if the answer is lost after the laptop saved it, sending it again doesn't make it twice
+      try { r = await fetch('/api/op', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: x.op, args: x.args, qid: x.qid }) }); j = await r.json().catch(() => ({})); }
       catch { break; }   // still no connection: try again later
       if (r.status === 401) { location.href = '/login'; return; }   // kept for after signing in again
+      if (unreachable(r)) break;   // the laptop is off or asleep: not its answer, so not a try
       if (r.ok) { qd.shift(); sent++; continue; }
       const why = j.error || 'the laptop said no';
       if (r.status >= 400 && r.status < 500 && r.status !== 408 && r.status !== 429) { qd.shift(); refused.push({ what: x.what || opWords(x.op), why }); continue; }
@@ -611,14 +637,17 @@ async function signOut(url, done) {   // done: already signed out at the laptop,
   if (unsent && !done && !confirm(`${unsent} change${unsent === 1 ? '' : 's'} you made offline ${unsent === 1 ? 'hasn’t' : 'haven’t'} reached the laptop yet. Sign out anyway and lose ${unsent === 1 ? 'it' : 'them'}?`)) return;
   for (const k of ['bi-view', 'bi-queue', 'bi-aside']) try { localStorage.removeItem(k); } catch {}
   try { navigator.serviceWorker?.controller?.postMessage('clear-data'); } catch {}
+  // and this phone stops getting your notifications: their words have your amounts in them, for anyone holding it
+  try { const sub = await within(pushSub(), 1500); if (sub) await within(Promise.all([post('/api/push/unsubscribe', { endpoint: sub.endpoint }, true), sub.unsubscribe()]), 2500); } catch {}
   try { await within(caches.delete('budget-it-data-v1'), 1500); } catch {}   // the same offline copy, from here, in case the worker is asleep
   location.href = url || '/api/logout';
 }
-window.addEventListener('online', () => flushQueue());
+window.addEventListener('online', () => { flushQueue(); refresh(); });
 async function post(url, body, quiet, op, canQueue) {
   let r, j = {};
   try { r = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }); j = await r.json().catch(() => ({})); }
   catch { if (canQueue) return 'offline'; toast('Couldn’t reach the laptop. Check your connection and try again.', false); return false; }
+  if (unreachable(r)) { if (canQueue) return 'offline'; toast('Couldn’t reach the laptop. It might be off or asleep. Try again in a bit.', false); return false; }
   if (r.status === 401) { location.href = '/login'; return false; }
   if (!r.ok) { toast(j.error || 'That didn’t work. Try again.', false); return false; }
   if (j.state) { setView(j); store.set('bi-view', VIEW); }
@@ -633,12 +662,15 @@ function afterChange(msg, op, quiet) {
 function live() {
   if (!window.EventSource) return;
   const es = new EventSource('/api/events');
-  let t; es.addEventListener('changed', () => { clearTimeout(t); t = setTimeout(refresh, 400); });
+  let t, lost = false; es.addEventListener('changed', () => { clearTimeout(t); t = setTimeout(refresh, 400); });
+  // back after the laptop restarted (an update) or the connection dropped: catch up, and send what waited
+  es.onerror = () => { lost = true; }; es.onopen = () => { if (lost) { lost = false; refresh(); } };
 }
 async function refresh(force) {
   if (!LAPTOP || (!force && document.getElementById('layer').innerHTML)) return;
   if (!force && (store.get('bi-queue') || []).length) return flushQueue();
-  try { const r = await fetch('/api/state', { credentials: 'same-origin' }); if (r.ok) { setView(await r.json()); store.set('bi-view', VIEW); render(); } } catch {}
+  // never the service worker's older copy (X-From-Cache): what's on screen already is at least as new
+  try { const r = await fetch('/api/state', { credentials: 'same-origin' }); if (r.ok && !r.headers.get('X-From-Cache')) { setView(await r.json()); store.set('bi-view', VIEW); render(); } } catch {}
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
 
@@ -846,7 +878,8 @@ const SPENDY = () => B.CATS.filter(c => !B.NOT_SPENDING.includes(c.id));
 const avgOf = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0;
 function trends() {
   const ms = months().slice(-12), full = ms.filter(m => m !== CUR), last = full[full.length - 1], before = full.slice(0, -1);
-  const every = m => SPENDY().filter(c => c.id !== 'home').reduce((s, c) => s + B.spent(S, c.id, m), 0), homeOf = m => B.spent(S, 'home', m);
+  const sp = B.spentBy(S);   // every category and month in one pass: Trends asks for a lot of them
+  const every = m => SPENDY().filter(c => c.id !== 'home').reduce((s, c) => s + sp(c.id, m), 0), homeOf = m => sp('home', m);
   const head = `<header class="top"><button class="icon-btn" type="button" data-back aria-label="Back">${svg('back')}</button><h1>Trends</h1></header>`;
   if (full.length < 2) return head + emptyCard('Trends need a little history', 'They show up once Budget it has a couple of full months. A bank connected through Plaid usually brings in up to two years.');
   const avgAll = avgOf(full.map(m => every(m) + homeOf(m)));
@@ -862,8 +895,8 @@ function trends() {
     ${[0, max / 2, max].map(v => `<line x1="${P.l}" x2="${W - P.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${P.l - 6}" y="${y(v) + 3.5}" text-anchor="end" font-size="9.5" fill="var(--muted)">$${v >= 1000 ? v / 1000 + 'k' : v}</text>`).join('')}
     ${bars}<line x1="${P.l}" x2="${W - P.r}" y1="${y(avgAll)}" y2="${y(avgAll)}" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="${P.l + 2}" y="${y(avgAll) - 5}" font-size="9.5" font-weight="700" fill="var(--ink)">Usual ${money(avgAll, { round: true })}</text></svg>`;
   // Each category: a usual month, last month, and how last month compared with the months before it
-  const rows = SPENDY().map(c => { const vals = ms.map(m => B.spent(S, c.id, m)), prior = avgOf(before.map(m => B.spent(S, c.id, m))), lastV = B.spent(S, c.id, last);
-    return { c, vals, usual: avgOf(full.map(m => B.spent(S, c.id, m))), prior, lastV, ch: prior > 20 ? (lastV - prior) / prior : null }; })
+  const rows = SPENDY().map(c => { const vals = ms.map(m => sp(c.id, m)), prior = avgOf(before.map(m => sp(c.id, m))), lastV = sp(c.id, last);
+    return { c, vals, usual: avgOf(full.map(m => sp(c.id, m))), prior, lastV, ch: prior > 20 ? (lastV - prior) / prior : null }; })
     .filter(r => r.vals.some(v => v > 0)).sort((a, b) => b.usual - a.usual);
   const spark = vals => { const mx = Math.max(1, ...vals); return `<svg viewBox="0 0 ${vals.length * 8} 24" width="${vals.length * 8}" height="24" aria-hidden="true">${vals.map((v, i) => { const h = Math.max(1.5, v / mx * 22); return `<rect x="${i * 8 + 1}" y="${24 - h}" width="5.5" height="${h}" rx="1.5" fill="var(--ink)" opacity="${i === vals.length - 1 ? .4 : 1}"/>`; }).join('')}</svg>`; };
   const big = rows.filter(r => r.ch !== null && Math.abs(r.ch) >= .2 && Math.abs(r.lastV - r.prior) > 25).sort((a, b) => Math.abs(b.ch) - Math.abs(a.ch)).slice(0, 3);
@@ -1116,6 +1149,8 @@ function editTxn(id) {
     };
   });
 }
+// What a charge sent to Split it was for in full: my part plus what housemates owe back ("count only my share")
+const sentWhole = t => -(t.a + ((S.txns || []).find(x => x.splitOf === t.id && x.owed)?.a || 0));
 // Send a charge to Split it as a shared expense (through Split it's assistant connection).
 async function splitSheet(t) {
   if (CLOUD) return sheet(`<h3>Send to Split it</h3><p class="note">Sending charges to Split it works in the laptop app, where Budget it and Split it run side by side. Here, add a tag like #house so you can find shared charges later.</p><div class="btns"><button class="btn" type="button" data-close>OK</button></div>`);
@@ -1125,7 +1160,7 @@ async function splitSheet(t) {
   if (!groups.length) return sheet(`<h3>No groups in Split it yet</h3><p>Make a group in Split it first, like “House”, then come back.</p><div class="btns"><button class="btn" type="button" data-close>OK</button></div>`);
   sheet(`<h3>Split it with someone</h3><p style="margin:-6px 0 0">Adds this to Split it as a shared expense you paid, split equally with everyone in the group.</p>
   <label class="f">What for<input class="inp" id="st" value="${esc(B.baseName(t.m))}"></label>
-  <div class="amtin"><span>$</span><input id="sm" inputmode="decimal" value="${(-t.a).toFixed(2)}" aria-label="Amount to split"></div>
+  <div class="amtin"><span>$</span><input id="sm" inputmode="decimal" value="${sentWhole(t).toFixed(2)}" aria-label="Amount to split"></div>
   <b>Group</b><div class="catgrid" role="group" aria-label="Group">${groups.map((g, k) => `<button type="button" data-grp="${esc(g)}" aria-pressed="${k === 0}"><span>${esc(g)}</span></button>`).join('')}</div>
   ${LAPTOP && !t.split ? `<label class="chk"><input type="checkbox" id="mine" ${store.get('bi-mine') === false ? '' : 'checked'}><span><b>Count only my share in my budget</b><br><span class="muted small">The part your housemates owe you back stops counting as your spending. It shows as its own line, “Owed back by housemates”.</span></span></label>` : ''}
   ${!LAPTOP ? '<p class="note">In this preview nothing is sent. On the laptop it goes straight into Split it.</p>' : ''}
@@ -1830,7 +1865,7 @@ function whatsnew() {
   <div class="facts"><div>${svg('bank', '')}<span><b>Your history stays</b>Disconnect a bank and its charges and your edits stay. Reconnect it and the history carries on.</span></div><div>${svg('people', '')}<span><b>Find your people</b>An @tag, a friend link with a QR code, and accounts shared only with the people you pick.</span></div><div>${svg('lock', '')}<span><b>Your data, your call</b>Download your data or delete it, and give an assistant read-only access.</span></div></div>
   <div class="rel"><h4>New</h4><ul><li>AI assistants in Settings: your connector link, one-tap Allow, read-only keys, and Disconnect.</li><li>People and friends: your @tag, find people by @tag or email, friend requests and a friend link with a QR code.</li><li>Share an account with the people you pick, instead of everyone here.</li><li>Disconnecting a bank keeps its history, and reconnecting carries it on with no doubles.</li><li>A heads-up when a bank needs you to sign in again, or a charge changes after you split it.</li><li>Download my data, and delete my data.</li></ul>
   <h4>Improved</h4><ul><li>New banks bring up to two years of history.</li><li>Changes made offline that couldn’t be saved are shown to you instead of vanishing.</li><li>A sign-in you keep using stays signed in.</li><li>Extra safety copies of your budget at every start and every 6 hours.</li></ul>
-  <h4>Fixed</h4><ul><li>One person’s wrong passwords no longer lock everyone out.</li><li>A full disk no longer stops the app.</li><li>Assistants can always connect, and a retry can’t add the same thing twice.</li><li>Lots of smaller fixes to CSV import, bills, reminders, undo and the look on phones and laptops.</li></ul>
+  <h4>Fixed</h4><ul><li>One person’s wrong passwords no longer lock everyone out.</li><li>A full disk no longer stops the app.</li><li>Assistants can always connect, and a retry can’t add the same thing twice.</li><li>Much faster with years of history, and the phone app works offline and tells you when a new version is ready.</li><li>Sending to Split it works with trip groups in other currencies and never counts your share twice.</li><li>Lots of smaller fixes to CSV import, bills, reminders, undo and the look on phones and laptops.</li></ul>
   <h4>Security</h4><ul><li>Changes from other websites are refused, sign-ins are stored hashed, and changing your email needs your password.</li><li>Unused assistant keys stop working after 90 days.</li><li>Backup copies leave out the bank key until they’re locked with a passphrase.</li></ul></div>
   <details class="rel"><summary><b>v1.0.0 · Meet Budget it</b></summary><div><h4>New</h4><ul><li>Accounts and net worth from Plaid, plus CSV import with a preview first.</li><li>Every month of history, and trends over 12 months: your usual month and what stood out.</li><li>Monthly budgets with rollover, carry-over of overspending, a per-day amount and suggestions.</li><li>Your own categories, and rules that match the start of a name or anywhere in it.</li><li>Transfers between your accounts are matched so they don't count as spending.</li><li>Hide a charge, tag charges like #japan-trip, split one across categories, add a receipt photo.</li><li>Your year in review, net worth over time, and a payoff planner for cards and loans.</li><li>Investment holdings with their value and gain, from your bank or added by hand.</li><li>Accounts in other currencies, like a US dollar account, added up in your home currency.</li><li>Change many charges at once, and search every month by name, note, amount or #tag.</li><li>Bills and subscriptions found from repeat charges, plus ones you add, monthly or yearly.</li><li>Heads-ups for big charges, new subscriptions, price increases and low chequing.</li><li>Savings goals, including goals that follow a savings account.</li><li>A Sunday check-in on your week, and nudges before a budget runs out.</li><li>Hide amounts with one tap, and export everything as a CSV.</li><li>Household sharing, quick add for cash, and Luffy and Hancock as guides.</li><li>Its own assistant connection: ask Claude or Muse about your money.</li><li>Send a charge to Split it and count only your share in your budget.</li><li>Your sign-in in Settings: change your password, add an email, and turn on a sign-in code from an authenticator app.</li><li>For whoever runs it: a page with people, reset links, health, backups and restore.</li><li>Today's rates for any home currency, not just CAD.</li></ul>
   <h4>Security</h4><ul><li>Bank connections are encrypted on your laptop and never leave it.</li><li>Receipt photos are kept on the laptop and only you can see yours.</li><li>Invite-only sign-in, the same as Split it, with an optional sign-in code as a second step.</li><li>Backups you can lock with a passphrase, and a locked copy to a second place every day.</li><li>Changing or resetting a password signs out your other phones at once.</li><li>Whoever runs it sees who is here and whether things work, never anyone's money.</li></ul>

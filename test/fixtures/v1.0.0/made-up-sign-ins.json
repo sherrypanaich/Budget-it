@@ -1,0 +1,18 @@
+{
+  "note": "Fake test sign-ins made by Budget it 1.0.0 for test/upgrade.test.js",
+  "passwords": {
+    "Ana": "ana-password",
+    "Ben": "ben-password"
+  },
+  "cookies": {
+    "Ana": "bi=3f78baa72130896ff0f1efd7a99ca2586a53dcba58e27be4390af205a5e311b3",
+    "Ben": "bi=b3faf8d3f172c1bfa348128e07ca964442769c1abb535683d266231cf2ecfc90"
+  },
+  "invite": "Z3WGLdW9HBij-Hfg7EtY321q",
+  "mcpKey": "bik_QBZPQULxeFn5_6MJUoxw5aDsSHaoMCPt0XyaDH6DF0U",
+  "oauth": {
+    "client_id": "c_dmLh24rZi6GncyLq",
+    "access_token": "LrNzj2e8yR_znsooMeQ2RzJ94HYIbcQFDT7cUanaFiw",
+    "refresh_token": "6XXUayaYcF5SP6nVQtizDc9ayDEWijsx4cN1YLkx2z4"
+  }
+}

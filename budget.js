@@ -57,6 +57,13 @@
     for (const t of mine(st)) if (t.c === cat && ymOf(t.date) === ym) s -= t.a;
     return round2(s);
   }
+  // spent() for many categories and months at once (the Trends page): one pass instead of one per category and month.
+  // A snapshot: make a new one after a change.
+  function spentBy(st) {
+    const m = new Map();
+    for (const t of mine(st)) { const k = t.c + '|' + ymOf(t.date); m.set(k, (m.get(k) || 0) - t.a); }
+    return (cat, ym) => round2(m.get(cat + '|' + ym) || 0);
+  }
   // A budget's limit this month: the monthly amount, plus last month's leftover when rollover is on.
   function limit(st, cat, ym) {
     const b = (st.budgets || {})[cat] || 0;
@@ -100,7 +107,14 @@
 
   // ---------- categories ----------
   const baseName = m => String(m || '').split(' · ')[0].trim();
-  const norm = m => baseName(m).toLowerCase().replace(/[#*]\s*\d+.*$/, '').replace(/\s+\d{3,}.*$/, '').replace(/[^a-z0-9&' ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  // Bills, alerts and "last time" categories run this over every transaction, and it's the same few hundred names
+  // again and again: each one is worked out once (a 5-year budget went from seconds to milliseconds on Home).
+  const normed = new Map();
+  const norm = m => {
+    const k = typeof m === 'string' ? m : String(m || ''); let v = normed.get(k);
+    if (v === undefined) { v = baseName(k).toLowerCase().replace(/[#*]\s*\d+.*$/, '').replace(/\s+\d{3,}.*$/, '').replace(/[^a-z0-9&' ]+/g, ' ').replace(/\s+/g, ' ').trim(); if (normed.size >= 20000) normed.clear(); normed.set(k, v); }
+    return v;
+  };
   // The part of a name a rule should match: "COSTCO WHOLESALE #551" -> "COSTCO WHOLESALE"
   const ruleName = m => baseName(m).replace(/\s*[#*]\s*\d.*$/, '').replace(/\s+\d{3,}.*$/, '').trim() || baseName(m);
   function ruleCat(rules, name) {
@@ -136,13 +150,18 @@
     return guessCat(name) || (amount > 0 ? 'income' : 'shopping');
   }
   // The category you used last time for this name, so quick add and CSV imports remember.
-  function lastCat(st, name) {
+  // idx (from lastCats) answers it for many names at once, like each row of a CSV file, without a pass over everything per row
+  function lastCat(st, name, idx) {
     const k = norm(name); if (!k) return null;
     let best = null;
-    for (const t of mine(st)) if (norm(t.m) === k && t.c !== 'transfer' && (!best || t.date > best.date)) best = t;
+    if (idx) best = idx.get(k) || null;
+    else for (const t of mine(st)) if (norm(t.m) === k && t.c !== 'transfer' && (!best || t.date > best.date)) best = t;
     return best && CAT_IDS.includes(best.c) ? best.c : null;
   }
-  const pickCat = (st, name, fallback) => ruleCat(st.rules, name) || fallback || lastCat(st, name) || guessCat(name) || 'shopping';
+  // The latest charge for each name; noteLast keeps it up to date as charges are added
+  const noteLast = (idx, t) => { if (t.other || t.hidden || t.c === 'transfer') return; const k = norm(t.m), b = idx.get(k); if (!b || t.date > b.date) idx.set(k, t); };
+  const lastCats = st => { const idx = new Map(); for (const t of mine(st)) noteLast(idx, t); return idx; };
+  const pickCat = (st, name, fallback, idx) => ruleCat(st.rules, name) || fallback || lastCat(st, name, idx) || guessCat(name) || 'shopping';
 
   // ---------- transfers ----------
   // Money leaving one of your accounts and the same amount arriving in another within 4 days is a transfer
@@ -318,19 +337,24 @@
     return out.sort((a, b) => a.d - b.d);
   }
   // Has this bill been charged in month ym?
-  const billPaid = (st, b, ym) => mine(st).some(t => norm(t.m) === (b.mine ? norm(b.n) : b.key) && ymOf(t.date) === ym && t.a < 0);
+  // idx (paidIndex): every name and month with a charge, made once when checking many bills
+  const paidIndex = st => { const idx = new Set(); for (const t of mine(st)) if (t.a < 0) idx.add(norm(t.m) + '|' + ymOf(t.date)); return idx; };
+  const paidIn = (st, b, ym, idx) => idx ? idx.has((b.mine ? norm(b.n) : b.key) + '|' + ym)
+    : mine(st).some(t => norm(t.m) === (b.mine ? norm(b.n) : b.key) && ymOf(t.date) === ym && t.a < 0);
+  const billPaid = (st, b, ym) => paidIn(st, b, ym);
   function upcoming(st, today) {
     const ym = ymOf(today), d = dayOf(today), dim = daysIn(ym);
     const T = new Date(today + 'T12:00:00');
+    let idx = null; const isPaid = (b, ym) => paidIn(st, b, ym, idx = idx || paidIndex(st));
     return bills(st, today).map(b => {
       if (b.every === 'year') {   // a yearly bill you added: due once a year, in its month
         const mo = +b.month || 1;
         let y = T.getFullYear(), due = `${y}-${pad(mo)}-${pad(Math.min(b.d, daysIn(`${y}-${pad(mo)}`)))}`;
-        const paid = ymOf(due) === ym && billPaid(st, b, ym);
+        const paid = ymOf(due) === ym && isPaid(b, ym);
         if (due < today || paid) { y++; due = `${y}-${pad(mo)}-${pad(Math.min(b.d, daysIn(`${y}-${pad(mo)}`)))}`; }
         return { ...b, paid, days: Math.round((new Date(due + 'T12:00:00') - T) / 864e5), late: false, due };
       }
-      const paid = billPaid(st, b, ym), day = Math.min(b.d, dim);
+      const paid = isPaid(b, ym), day = Math.min(b.d, dim);
       const days = paid ? dim - d + Math.min(b.d, daysIn(nextYm(ym))) : day - d;
       return { ...b, paid, days, late: !paid && days < 0, due: paid ? `${nextYm(ym)}-${pad(Math.min(b.d, daysIn(nextYm(ym))))}` : `${ym}-${pad(day)}` };
     }).sort((a, b) => a.days - b.days);
@@ -382,15 +406,17 @@
   function alerts(st, today) {
     const out = [], T = new Date(today + 'T12:00:00').getTime(), back = n => ymd(new Date(T - n * 864e5)), list = mine(st), seen = new Set(st.dismissed || []);
     const fmt = v => '$' + Math.abs(v).toFixed(2);
+    const byName = new Map();   // every charge by name, once, instead of a pass over everything for each one
+    for (const x of list) if (x.a < 0) { const k = norm(x.m); if (!byName.has(k)) byName.set(k, []); byName.get(k).push(x); }
     for (const t of list) {
       if (t.a >= 0 || t.date < back(3) || ['home', 'transfer', 'income'].includes(t.c) || t.manual) continue;
-      const k = norm(t.m), before = list.filter(x => x !== t && x.a < 0 && norm(x.m) === k && x.date < t.date).map(x => -x.a).sort((a, b) => a - b);
+      const k = norm(t.m), before = (byName.get(k) || []).filter(x => x !== t && x.date < t.date).map(x => -x.a).sort((a, b) => a - b);
       const usual = before.length >= 2 ? before[Math.floor(before.length / 2)] : null;
       if (-t.a >= 150 && (usual ? -t.a > usual * 3 : -t.a >= 400)) out.push({ key: 'big:' + t.id, kind: 'big', id: t.id, title: `${fmt(t.a)} at ${baseName(t.m)}`, body: usual ? `About ${Math.round(-t.a / usual)} times what it usually is. Was this you?` : 'A bigger charge than usual. Was this you?' });
     }
     for (const b of bills(st, today)) {
       if (b.mine) continue;
-      const ts = list.filter(t => norm(t.m) === b.key && t.a < 0).sort((x, y) => x.date.localeCompare(y.date));
+      const ts = (byName.get(b.key) || []).slice().sort((x, y) => x.date.localeCompare(y.date));
       if (b.sub && ts.length && ts[0].date >= back(45)) out.push({ key: 'newsub:' + b.key, kind: 'newsub', title: `New subscription: ${b.n}`, body: `${fmt(b.a)} a month, about ${fmt(b.a * 12)} a year.` });
       if (b.sub && ts.length >= 2) { const a = -ts[ts.length - 1].a, p = -ts[ts.length - 2].a;
         if (a - p >= 0.5 && a > p * 1.03 && ts[ts.length - 1].date >= back(35)) out.push({ key: `up:${b.key}:${ts[ts.length - 1].date}`, kind: 'priceup', title: `${b.n} went up ${fmt(a - p)}`, body: `It's ${fmt(a)} now, was ${fmt(p)}. That's ${fmt((a - p) * 12)} more a year.` }); }
@@ -530,8 +556,8 @@
     if (t.orig) { t.a = t.orig.a; delete t.orig; delete t.norate; }
     return convertTxn(st, t, cur);
   }
-  const api = { CURRENCIES, homeCur, rate, inHome, missingRates, convertTxn, reconvert, plaidBills, holdings, plaidHoldings, worth, noteWorth, worthSeries, payoff, payFor, yearReview, useCats, lastCat, matchTransfers, payday, safeToSpend, goalSaved, tagTotals, week, alerts, toCsv, ruleName, CATS, CAT_IDS, NOT_SPENDING, catName, round2, ymd, ymOf, ymNow, prevYm, nextYm, daysIn, dayOf, monthsBetween,
-    mine, spent, limit, budgeted, totals, perDay, moneyOut, moneyIn, budgetState, budgetStatus,
+  const api = { CURRENCIES, homeCur, rate, inHome, missingRates, convertTxn, reconvert, plaidBills, holdings, plaidHoldings, worth, noteWorth, worthSeries, payoff, payFor, yearReview, useCats, lastCat, lastCats, noteLast, matchTransfers, payday, safeToSpend, goalSaved, tagTotals, week, alerts, toCsv, ruleName, CATS, CAT_IDS, NOT_SPENDING, catName, round2, ymd, ymOf, ymNow, prevYm, nextYm, daysIn, dayOf, monthsBetween,
+    mine, spent, spentBy, limit, budgeted, totals, perDay, moneyOut, moneyIn, budgetState, budgetStatus,
     baseName, norm, ruleCat, guessCat, plaidCat, pickCat, parseQuick, csvRows, parseCsv, toDate, bills, billPaid, upcoming, dueOn, goalMonthly, topMerchants };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Budget = api;
 })(typeof window !== 'undefined' ? window : this);

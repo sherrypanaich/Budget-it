@@ -7,7 +7,7 @@ Wants=network-online.target
 # Expects the app in ~/budget-it. Change both paths below if you put it elsewhere.
 WorkingDirectory=%h/budget-it
 ExecStart=/usr/bin/env node %h/budget-it/server.js
-Environment=PORT=8090
+# Settings (PORT, Plaid keys...) go in ~/budget-it/budget-it.env, not here: a line here would win over that file.
 Restart=always
 RestartSec=5
 

@@ -48,14 +48,14 @@
         return `Changed ${n} transaction${n === 1 ? '' : 's'}`;
       },
       'txn.receipt'(s, a) { const t = find(s, a.id); if (a.receipt) t.receipt = text(a.receipt, 2e6); else delete t.receipt; return a.receipt ? 'Receipt added' : 'Receipt removed'; },
-      'txn.sent'(s, a) { const t = find(s, a.id); t.sentTo = text(a.to, 60); return ''; },
+      'txn.sent'(s, a) { const t = find(s, a.id); t.sentTo = text(a.to, 60); if (a.ref) t.sentRef = text(a.ref, 60); return ''; },
       // Sent to Split it with "count only my share": the part housemates owe back becomes its own line that isn't spending.
       'txn.share'(s, a) {
         const t = find(s, a.id), amt = num(a.amount);
         if (t.a >= 0 || t.split || !(amt > 0 && amt < -t.a)) return '';
         t.a = B.round2(t.a + amt); t.split = true; t.fresh = false;
         delete t.orig; delete t.norate;
-        const { receipt, pair, sentTo, plaidId, ...rest } = t;
+        const { receipt, pair, sentTo, sentRef, plaidId, ...rest } = t;
         s.txns.push({ ...rest, id: t.id + '-2', a: -amt, c: 'transfer', splitOf: t.id, set: true, owed: text(a.to, 60) || true, note: 'Owed back by housemates' + (a.to ? ' (' + text(a.to, 60) + ')' : '') });
         return `Only your share ($${(-t.a).toFixed(2)}) counts in your budget`;
       },
@@ -68,7 +68,7 @@
         t.a = B.round2(t.a + amt); t.split = true; t.fresh = false;
         delete t.orig; delete t.norate;   // split parts are in home money from here on
         // The second part is its own line: it doesn't take the receipt, the transfer match or the Split it mark with it.
-        const { receipt, pair, sentTo, plaidId, ...rest } = t;
+        const { receipt, pair, sentTo, sentRef, plaidId, ...rest } = t;
         s.txns.push({ ...rest, id: t.id + '-2', a: -amt, c: a.c, splitOf: t.id, set: true });
         return `Moved $${amt.toFixed(2)} to ${B.catName(a.c)}`;
       },
@@ -294,10 +294,11 @@
         // charge, so renaming or splitting it later doesn't make it look new.
         const key = (d, a, m) => d + '|' + a + '|' + B.norm(m), have = new Map(), used = new Map();
         for (const t of s.txns) if (t.acct === acct.id && !t.splitOf) { const k = t.csvKey || key(t.date, t.orig ? t.orig.a : t.a, t.m); have.set(k, (have.get(k) || 0) + 1); }
-        let n = 0;
+        let n = 0; const last = B.lastCats(s);   // "the category you used last time", for every row without a pass over everything each
         for (const r of rows) {
           const k = key(r.date, r.a, r.m), u = (used.get(k) || 0) + 1; used.set(k, u); if (u <= (have.get(k) || 0)) continue;
-          s.txns.push(B.convertTxn(s, { id: rid('c'), date: r.date, acct: acct.id, m: r.m, a: r.a, c: B.pickCat(s, r.m, r.a > 0 ? 'income' : null), note: '', fresh: true, csv: true, csvKey: k }, acct.cur));
+          const t = B.convertTxn(s, { id: rid('c'), date: r.date, acct: acct.id, m: r.m, a: r.a, c: B.pickCat(s, r.m, r.a > 0 ? 'income' : null, last), note: '', fresh: true, csv: true, csvKey: k }, acct.cur);
+          s.txns.push(t); B.noteLast(last, t);
           n++;
         }
         s.seenNew = 0;

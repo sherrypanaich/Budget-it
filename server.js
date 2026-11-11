@@ -11,7 +11,7 @@
 //   node server.js backup FILE        write a full backup (data and sign-ins); asks for a passphrase to lock it
 //   node server.js restore FILE       put a backup back (the app must be stopped); also takes a db-....json copy
 // These work while the app is running: the command hands the job to the running app, so it takes effect right away.
-//   node server.js mcp-key NAME       a key for an AI assistant (see mcp.js)
+//   node server.js mcp-key NAME       a key for an AI assistant (see mcp.js); add --read-only for one that can't change anything
 //   node server.js mcp-revoke NAME
 'use strict';
 const http = require('http');
@@ -30,7 +30,8 @@ const STARTED = Date.now();
 try {
   for (const line of fs.readFileSync(path.join(__dirname, 'budget-it.env'), 'utf8').split(/\r?\n/)) {
     const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$/);
-    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
+    // An empty line is the same as no line: TZ= would otherwise mean UTC instead of the computer's own time zone
+    if (m && m[2] && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
   }
 } catch (e) { if (e.code !== 'ENOENT') console.error('Couldn’t read budget-it.env:', e.message); }
 
@@ -144,6 +145,7 @@ const stateOf = uid => { if (!db.people[uid]) { db.people[uid] = blank(); saveDb
 const nameFor = id => users.users[id]?.name || 'Someone';
 const rid = (p = '') => p + crypto.randomBytes(8).toString('hex');
 const undo = new Map();   // uid -> [snapshots], in memory: undo is for the last few taps, not history
+const doneQids = new Map();   // uid -> ids of the last changes sent from a phone's offline list
 
 // Who besides its owner can see an account: a list of people. Before 1.1 `shared: true` meant everyone on this
 // Budget it; that still reads as everyone until migrateShares turns it into the list of people who were here.
@@ -342,12 +344,13 @@ async function syncItem(itemId) {
   }
 }
 async function syncAll(uid) {
-  let added = 0; const errors = [];
+  let added = 0, banks = 0; const errors = [];
   for (const [id, it] of Object.entries(db.items)) {
     if (uid && it.uid !== uid) continue;
+    banks++;
     try { added += (await syncItem(id)).added; } catch (e) { errors.push(`${it.inst}: ${e.message}`); }
   }
-  return { added, errors };
+  return { added, errors, banks };
 }
 async function removeItem(uid, itemId) {
   const it = db.items[itemId]; if (!it || it.uid !== uid) bad('That bank isn’t connected.');
@@ -398,10 +401,17 @@ async function splitItOk(u) {
 }
 // What Split it said my part of a new expense is, in dollars, or null when it didn't say.
 // Best is the numbers in its answer (structuredContent.yourShareCents, or yourShare in dollars), when it sends them.
+// Those are in Split it's home currency: when that isn't the money the amount went in (sent: { amount, cur }),
+// my part is the same fraction of what was sent (yourShareCents of totalCents), so it comes back in Budget it's money.
 // Otherwise the sentence: newer Split it ends with "Your share: $30.00."; older ones list names and amounts in the same order.
-function myShareFrom(msg, result) {
+function myShareFrom(msg, result, sent) {
   const sc = result && typeof result === 'object' ? (result.structuredContent && typeof result.structuredContent === 'object' ? result.structuredContent : result) : {};
   const cents = sc.yourShareCents ?? sc.share?.yourShareCents, dollars = sc.yourShare ?? sc.share?.yourShare ?? (typeof sc.share === 'number' ? sc.share : undefined);
+  const amt = num(sent?.amount), total = sc.totalCents;
+  if (amt > 0 && sent.cur && typeof sc.currency === 'string' && sc.currency.toUpperCase() !== sent.cur) {
+    if (!(Number.isInteger(cents) && cents >= 0 && Number.isInteger(total) && total >= cents && total > 0)) return null;   // no fair way back
+    return B.round2(amt * cents / total);
+  }
   if (Number.isInteger(cents) && cents >= 0) return B.round2(cents / 100);
   if (dollars !== undefined && dollars !== null && num(dollars) >= 0) return num(dollars);
   msg = String(msg || '');
@@ -413,12 +423,20 @@ function myShareFrom(msg, result) {
   const i = names.indexOf('you');
   return names.length === amounts.length ? (i < 0 ? 0 : amounts[i]) : null;
 }
+// The group names in Split it's list_groups answer, one a line. Split it 2.2 puts each name in quotes
+// ("House": you, Mo...), so a name with a colon survives; older ones write House: you, Mo...
+const splitGroupsFrom = txt => String(txt || '').split('\n').map(l => {
+  const m = /^\s*("(?:[^"\\]|\\.)*")\s*:/.exec(l);
+  if (m) try { return String(JSON.parse(m[1])).trim(); } catch {}
+  return l.split(':')[0].trim();
+}).filter(g => g && !/not in any groups/i.test(g));
 
 // ---------- phone notifications ----------
 let pushKeys = push.loadKeys(PUSH_KEYS_FILE);
-async function notify(uid, message) {
+async function notify(uid, message, only) {   // only: one phone's endpoint
   let sent = 0, changed = false;
   for (const sub of [...(pushes.subs[uid] || [])]) {
+    if (only && sub.endpoint !== only) continue;
     const r = await push.sendOne(pushKeys, sub, { url: '/', ...message }, PUSH_CONTACT);
     if (r === 'ok') sent++;
     if (r === 'gone') { pushes.subs[uid] = pushes.subs[uid].filter(s => s !== sub); changed = true; }
@@ -564,6 +582,10 @@ function unlock(buf, pass) {
 const heldByUndo = f => [...undo.values()].some(list => list.some(x => x.includes(f)));
 function sweepReceipts(uid) {   // one person's, right after a change of theirs
   let names; try { names = fs.readdirSync(RECEIPT_DIR).filter(f => f.startsWith(uid + '_')); } catch { return; }
+  // the photos charges point to, looked up at once: searching all the charges for each photo took a tenth of a
+  // second per change on a big budget. Only one that isn't found is looked for everywhere, the slow way.
+  const held = new Set(); for (const t of db.people[uid]?.txns || []) if (t.receipt) held.add(path.basename(String(t.receipt)));
+  names = names.filter(f => !held.has(f));
   if (!names.length) return;
   const now = JSON.stringify(db.people[uid]?.txns || []);
   for (const f of names) if (!now.includes(f) && !heldByUndo(f)) try { fs.rmSync(path.join(RECEIPT_DIR, f), { force: true }); } catch {}
@@ -837,7 +859,7 @@ const SECURITY = {
 function out(res, code, headers, body) {
   const req = res.req, h = { ...SECURITY, ...headers };
   let buf = Buffer.isBuffer(body) ? body : Buffer.from(body == null ? '' : String(body));
-  if (buf.length > 800 && compressible(h['Content-Type'] || '') && gzOk(req)) { buf = zlib.gzipSync(buf, { level: 6 }); h['Content-Encoding'] = 'gzip'; h.Vary = 'Accept-Encoding'; }
+  if (buf.length > 800 && compressible(h['Content-Type'] || '') && gzOk(req)) { buf = zlib.gzipSync(buf, { level: buf.length > 5e5 ? 4 : 6 }); h['Content-Encoding'] = 'gzip'; h.Vary = 'Accept-Encoding'; }   // level 4 for a big budget's state: half the time, 8% more bytes
   h['Content-Length'] = buf.length;
   res.writeHead(code, h); res.end(req && req.method === 'HEAD' ? undefined : buf);
 }
@@ -941,7 +963,8 @@ async function handle(req, res) {
   if (p.startsWith('/api/') && !['GET', 'HEAD', 'OPTIONS'].includes(m) && otherSite(req)) return send(res, 403, { error: 'That came from another website, so Budget it didn’t do it. Open Budget it itself and try again.' });
   const uid = sessionUid(req);
   if (uid && !p.startsWith('/auth/')) keepSession(req, res);
-  if (PUBLIC_FILES.has(p)) return file(res, p.slice(1), null, p === '/sw.js' ? 'no-cache' : 'public, max-age=86400');
+  // code and the manifest are checked each time (a quick "not changed"), so an update never waits a day for them
+  if (PUBLIC_FILES.has(p)) return file(res, p.slice(1), null, /^\/(sw|qr)\.js$|webmanifest$/.test(p) ? 'no-cache' : 'public, max-age=86400');
   if (/^\/art\/[a-z0-9-]+\.(webp|png)$/.test(p)) return file(res, p.slice(1), null, 'public, max-age=604800');
   if (p === '/budget.js' || p === '/sample.js' || p === '/ops.js') return file(res, p.slice(1), null, 'no-cache', __dirname);
   if (p === '/login' && m === 'GET') return file(res, 'login.html');
@@ -957,7 +980,8 @@ async function handle(req, res) {
   }
   if (p === '/api/logout') {
     if (sessionDrop(users, cookies(req).bi)) saveUsers();
-    setCookie(req, res, '', 0); res.writeHead(302, { Location: '/login' }); return res.end();
+    // and the browser drops what it kept in its own cache (receipt photos), for whoever signs in on this phone next
+    setCookie(req, res, '', 0); res.writeHead(302, { Location: '/login', 'Clear-Site-Data': '"cache"' }); return res.end();
   }
   if (await accounts(req, res, url, uid)) return;   // invites, email, Google, password reset (accounts.js)
   if (!uid) {
@@ -1104,31 +1128,49 @@ async function handle(req, res) {
     saveDb(); return send(res, 200, { ok: true, msg: 'Connected to Split it', ...viewFor(uid) });
   }
   if (p === '/api/splitit/groups' && m === 'GET') {
-    const txt = await splitIt(uid, 'list_groups', {});
-    return send(res, 200, { groups: txt.split('\n').map(l => l.split(':')[0].trim()).filter(g => g && !/not in any groups/i.test(g)) });
+    const r = await splitItCall(uid, 'list_groups', {});
+    // Split it 2.2+ sends the names as data; older ones only in the sentence
+    const named = r.result?.structuredContent?.groups;
+    const groups = Array.isArray(named) ? named.map(g => String(g?.name || '').trim()).filter(Boolean) : splitGroupsFrom(r.text);
+    return send(res, 200, { groups });
   }
   if (p === '/api/splitit/send' && m === 'POST') {
     const { id, group, amount, title, mine } = await readBody(req);
-    const t = stateOf(uid).txns.find(x => x.id === id && !x.other); if (!t) return send(res, 404, { error: 'That transaction isn’t there any more.' });
-    const amt = num(amount ?? -t.a); if (!(amt > 0)) return send(res, 400, { error: 'Enter the amount to split.' });
+    const s = stateOf(uid), t = s.txns.find(x => x.id === id && !x.other); if (!t) return send(res, 404, { error: 'That transaction isn’t there any more.' });
+    // Sent again after "count only my share": the whole charge again, not just my part of it
+    const owed = s.txns.find(x => x.splitOf === t.id && x.owed), amt = B.round2(num(amount ?? -(t.a + (owed ? owed.a : 0)))); if (!(amt > 0)) return send(res, 400, { error: 'Enter the amount to split.' });
     const SPLIT_CATS = { groceries: 'groceries', dining: 'food', transport: 'transport', home: 'household', fun: 'fun' };
-    const { text: msg, result: said } = await splitItCall(uid, 'add_expense', { title: text(title || B.baseName(t.m), 60), amount: amt, group: text(group, 60), category: SPLIT_CATS[t.c] || 'other', date: t.date, note: 'From Budget it' });
-    applyOp(uid, 'txn.sent', { id, to: text(group, 60) }, true);
+    // The amount is in Budget it's home money: say which, so a trip group paying in euros (or a Split it kept in
+    // other money) doesn't have to guess. No card fee on top: the bank charge already has any fee in it.
+    const cur = B.homeCur(s), to = text(group, 60);
+    const { text: msg, result: said } = await splitItCall(uid, 'add_expense', { title: text(title || B.baseName(t.m), 60), amount: amt, currency: cur, card_fee_percent: 0, group: to, category: SPLIT_CATS[t.c] || 'other', date: t.date, note: 'From Budget it' });
+    const sc = said?.structuredContent || {}, ref = typeof sc.id === 'string' && sc.id ? sc.id.slice(0, 60) : undefined;
+    // Split it adds the same title, amount, date and group only once in 2 minutes and answers duplicate: true with
+    // the first one. When another charge here is that first one, this charge isn't in Split it: count nothing for it.
+    const other = sc.duplicate === true && ref && s.txns.find(x => x.sentRef === ref && x.id !== t.id);
+    if (other) return send(res, 409, { error: `Split it already has this from “${text(other.m, 60)}” a moment ago, so it wasn’t added again. To add a second one, change the title a little.` });
+    applyOp(uid, 'txn.sent', { id, to, ref }, true);
     // "Count only my share": the part housemates owe back stops counting as my spending
     let extra = '';
     if (mine) {
-      const share = myShareFrom(msg, said), back = share == null ? null : B.round2(amt - share);
-      if (back == null) extra = ' Split it didn’t say what your share is, so the whole amount still counts in your budget.';
-      else if (back > 0 && back < -t.a && !t.split) { const r = applyOp(uid, 'txn.share', { id, amount: back, to: text(group, 60) }, true); extra = r.msg ? '. ' + r.msg : ''; }
+      const share = myShareFrom(msg, said, { amount: amt, cur }), back = share == null ? null : B.round2(amt - share);
+      if (back == null) extra = '. Split it didn’t say what your share is, so the whole amount still counts in your budget';
+      else if (back > 0 && back < -t.a && !t.split) { const r = applyOp(uid, 'txn.share', { id, amount: back, to }, true); extra = r.msg ? '. ' + r.msg : ''; }
       else if (back > 0 && back >= -t.a && !t.split) { applyOp(uid, 'txn.update', { id, c: 'transfer' }); extra = '. None of it is yours, so it no longer counts as spending'; }
     }
     changed([uid]);
-    return send(res, 200, { ok: true, msg: msg.split(' paid by')[0].replace(/[.,]$/, '') + extra, ...viewFor(uid) });
+    // A second tap (or a retry after a slow answer) finds it already there: Split it didn't add it twice, and neither does the budget
+    const said1 = sc.duplicate === true ? `It’s already in Split it (${to}), so it wasn’t added twice` : msg.split(' paid by')[0].replace(/[.,]$/, '');
+    return send(res, 200, { ok: true, msg: said1 + extra, ...viewFor(uid) });
   }
   if (p === '/api/op' && m === 'POST') {
-    const { op, args } = await readBody(req);
+    const { op, args, qid } = await readBody(req);
+    // A change from a phone's offline list carries an id: sent again because the answer got lost, it's done once
+    const q = typeof qid === 'string' && qid.length <= 40 ? qid : null, seen = doneQids.get(uid) || new Set();
+    if (q && seen.has(q)) return send(res, 200, { ok: true, msg: 'Already saved', ...viewFor(uid) });
     const was = householdOf(uid);   // someone you just stopped sharing with gets a reload too
     const r = applyOp(uid, String(op || ''), args && typeof args === 'object' && !Array.isArray(args) ? args : {});
+    if (q) { seen.add(q); if (seen.size > 500) seen.delete(seen.values().next().value); doneQids.set(uid, seen); }
     durable();
     changed([...new Set([...was, ...householdOf(uid)])]);
     return send(res, 200, { ok: true, msg: r.msg, ...viewFor(uid) });
@@ -1204,11 +1246,18 @@ async function handle(req, res) {
   if (p === '/api/push/subscribe' && m === 'POST') {
     const sub = await readBody(req);
     if (!sub || typeof sub.endpoint !== 'string' || !/^https:\/\//.test(sub.endpoint) || !sub.keys?.p256dh || !sub.keys?.auth) return send(res, 400, { error: 'bad subscription' });
+    // quiet: the page (or the phone, when it renews a subscription) making sure the laptop still has this one. It's added
+    // back if the laptop lost it, but never taken from someone else who turned notifications on on this phone since.
+    const owner = Object.keys(pushes.subs).find(id => pushes.subs[id].some(s => s.endpoint === sub.endpoint));
+    if (sub.quiet && owner) return send(res, 200, { ok: true, mine: owner === uid });
     for (const id in pushes.subs) pushes.subs[id] = pushes.subs[id].filter(s => s.endpoint !== sub.endpoint);
-    (pushes.subs[uid] = pushes.subs[uid] || []).push({ endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } });
+    const list = pushes.subs[uid] = pushes.subs[uid] || [];
+    list.push({ endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } });
+    if (list.length > 10) list.splice(0, list.length - 10);   // a phone's old subscriptions, long replaced
     savePushes();
-    await notify(uid, { title: 'Budget it', body: 'Notifications are on. You’ll hear when a budget is nearly used up and the evening before a bill.', tag: 'test' });
-    return send(res, 200, { ok: true });
+    // the hello goes to the phone just turned on, not to the others again
+    if (!sub.quiet) await notify(uid, { title: 'Budget it', body: 'Notifications are on. You’ll hear when a budget is nearly used up and the evening before a bill.', tag: 'test' }, sub.endpoint);
+    return send(res, 200, { ok: true, mine: true });
   }
   if (p === '/api/push/unsubscribe' && m === 'POST') {
     const { endpoint } = await readBody(req);
@@ -1241,6 +1290,7 @@ async function cli([cmd, ...rest]) {
     const pass = process.env.BACKUP_PASSPHRASE || await ask('Passphrase to lock it with (8+ characters, or Enter for none): ');
     if (pass && pass.length < 8) return console.log('Too short, nothing written.');
     const f = name || `budget-it-backup-${B.ymd(new Date())}.${pass ? 'locked' : 'zip'}`;
+    await askServer({ cmd: 'ping' });   // when the app is running, it writes its last few changes first, so the backup has them
     writeBackupFile(f, pass);
     return console.log(pass ? `Wrote ${f}, locked with your passphrase. Without the passphrase nobody can open it, you included.` : `Wrote ${f}. It can unlock your bank connections, so keep it somewhere private.`);
   }
@@ -1251,7 +1301,7 @@ async function cli([cmd, ...rest]) {
     try { const r = restoreBackup(buf, pass); flushDb(); return console.log(`Restored ${r.people} budget${r.people === 1 ? '' : 's'}, ${r.banks} bank connection${r.banks === 1 ? '' : 's'} and ${r.receipts} receipt photo${r.receipts === 1 ? '' : 's'}. What was there before is in data/backups (before-restore-...).`); }
     catch (e) { return console.log(e.message); }
   }
-  if (!['add-user', 'set-password', 'remove-user', 'code-off', 'sample'].includes(cmd)) return console.log('Commands: add-user NAME, set-password NAME, remove-user NAME, code-off NAME, list-users, sample NAME, backup FILE, restore FILE, mcp-key NAME, mcp-revoke NAME');
+  if (!['add-user', 'set-password', 'remove-user', 'code-off', 'sample'].includes(cmd)) return console.log('Commands: add-user NAME, set-password NAME, remove-user NAME, code-off NAME, list-users, sample NAME, backup FILE, restore FILE, mcp-key NAME [--read-only], mcp-revoke NAME');
   if (!name) return console.log(`Usage: node server.js ${cmd} NAME`);
   const found = findUser(name), job = { cmd, name };
   if (cmd === 'add-user' && found) return console.log(`${name} already exists. Use set-password to change it.`);
@@ -1273,7 +1323,7 @@ async function cli([cmd, ...rest]) {
 }
 // What those commands do. Used here when the app is stopped, and by the running app when it is asked (see /api/local/cli).
 function localCommand({ cmd, name, password }) {
-  if (cmd === 'ping') return { text: 'running' };
+  if (cmd === 'ping') { flushDb(); return { text: 'running' }; }   // and the last few changes are on disk, for a backup taken while it runs
   const found = findUser(name || '');
   if (cmd === 'add-user') {
     if (found) return { text: `${name} already exists. Use set-password to change it.` };
@@ -1315,11 +1365,13 @@ function claimLock() {
 const dropLock = () => { try { if (JSON.parse(fs.readFileSync(LOCK_FILE, 'utf8')).pid === process.pid) fs.unlinkSync(LOCK_FILE); } catch {} };
 async function askServer(job) {   // -> the running app's answer, null when none is running, {} when it didn't answer
   let lk; try { lk = JSON.parse(fs.readFileSync(LOCK_FILE, 'utf8')); process.kill(lk.pid, 0); } catch { return null; }
+  // A lock left by an app that was killed: in Docker every container's first process is number 1, this command too
+  if (lk.pid === process.pid) return null;
   try {
     const r = await fetch(`http://127.0.0.1:${lk.port}/api/local/cli`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Local-Token': lk.token },
       body: JSON.stringify(job), signal: AbortSignal.timeout(8000) });
     return r.ok ? await r.json() : {};
-  } catch { return {}; }
+  } catch (e) { return e.cause?.code === 'ECONNREFUSED' ? null : {}; }   // nothing listening there: the app isn't running
 }
 
 if (require.main === module) {
@@ -1361,4 +1413,4 @@ if (require.main === module) {
       .listen(PORT, HOST, () => console.log(`Budget it ${VERSION} running at http://${HOST}:${PORT}`));
   }
 }
-module.exports = { OPS, applyOp, viewFor, syncAll, connectItem, removeItem, _db: () => db, zipWrite, zipRead, lock, unlock, isLocked, newerThan, myShareFrom, handle, restoreBackup, latestRelease, receiptsBackup };
+module.exports = { OPS, applyOp, viewFor, syncAll, connectItem, removeItem, _db: () => db, zipWrite, zipRead, lock, unlock, isLocked, newerThan, myShareFrom, splitGroupsFrom, handle, restoreBackup, latestRelease, receiptsBackup };
