@@ -1,7 +1,12 @@
 data
 node_modules
+test
+scripts
+.git
+.github
+.claude
+docs
 *.tar.gz
 *.zip
+*.locked
 budget-it.env
-docs
-.github

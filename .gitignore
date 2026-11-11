@@ -2,3 +2,5 @@ data/
 budget-it.env
 *.log
 *.zip
+# made-up data for the tests (test/fixtures/make-v1.0.0.js)
+!test/fixtures/**

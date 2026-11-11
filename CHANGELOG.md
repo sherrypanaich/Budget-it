@@ -1,16 +1,142 @@
 # What's new in Budget it
 
-## v1.1.0 · Draft, not released yet
+## v1.1.0 · November 11, 2026
 
-**Connect your own AI assistant.** Everyone using Budget it can now link Claude, Muse or ChatGPT to their own budget from the app, and see or disconnect what's linked.
+**Safer to run, kinder to your history.** Disconnecting a bank no longer throws away its history, one person's wrong passwords no longer lock everyone out, a full disk no longer stops the app, and you can connect your own AI assistant from Settings.
+
+### Highlights
+- **Your history stays.** Disconnect a bank and its accounts, charges and your edits stay put. Reconnect it and the history carries on with no doubles.
+- **Built for running behind Coolify and Cloudflare.** Each visitor gets their own wrong-password limit, and changes sent from other websites are refused.
+- **Find your people.** Everyone gets an @tag, a friend link with a QR code, and accounts can be shared with the people you pick instead of everyone here.
+- **Faster, and works offline.** Opening a budget with years of history takes a fraction of a second, and the phone app keeps working when the laptop is asleep.
+- **Connect your own AI assistant.** Link Claude, Muse or ChatGPT from Settings, with one tap if you're already signed in, and make read-only keys.
 
 ### New
-- Settings has a new **AI assistants** page: your connector link with a Copy button, steps for adding it to Claude, and a list of the assistants and keys that act as you, with when each was last used.
-- Make your own key for an assistant that asks for an API key or bearer token, right in the app. It's shown once, and only works as you.
-- Disconnect one assistant, or all of them, with a tap. The Accounts page links here too.
+- Settings has a new **AI assistants** page: your connector link with a Copy button, steps for adding it to Claude, and a list of the assistants and keys that act as you, with when each was last used. Make your own key there (it's shown once), tick **Read only** for an assistant that should only look, and disconnect one or all of them with a tap.
+- One-tap Allow: if you're already signed in to Budget it in that browser, connecting an assistant takes one tap. This also fixes the dead end for people who signed up with Google and have no password. The page shows where access goes ("Budget it sends access to: claude.ai").
+- `node server.js mcp-key NAME --read-only` makes a read-only key on the laptop.
+- **People and friends** in Settings: your own @tag (change it any time), find someone already on Budget it by their exact @tag or checked email and send a friend request, your friend link with a QR code ("Make a new link" turns the old one off), and your open invite links and requests with Cancel.
+- Share an account with the people you pick: the account sheet has a checkbox for each person, friends first. Accounts that were shared with everyone stay shared with the people who were here, and someone who joins later doesn't see them.
+- Disconnecting a bank keeps its history. Its accounts show "Disconnected · history kept", and "Delete this history" removes it for good if you really want it gone.
+- Reconnecting a bank carries its old accounts on, matched by bank, kind of account and last 4 digits. Charges that come back again are matched so nothing is doubled, and your categories, notes, tags, splits and receipts stay.
+- When a bank needs you to sign in again, your phone gets one notification and it shows under "Needs you" with a Reconnect button.
+- If a charge changes after you split it (a tip added when it posts), it's flagged under "Needs you": "<Store> changed from $X to $Y after you split it."
+- Settings, **Your data**: download a copy of your own data, or delete your data and your account (you type your name to confirm).
+- Extra safety copies of your budgets: one at every start (so every update has one) and one every 6 hours, on top of the daily and weekly ones.
+- If the budgets file was damaged at start, whoever runs Budget it sees which copy was used and its date, until they dismiss it.
+- Restore also takes a plain `db-….json` copy from `data/backups`.
+- The owner's update check marks a security release with a red "Security update".
+- Releases are checked on a real Docker host first: build, sign in, restart, and check the data and time zone are still right.
+- The README has Docker install steps, how updating works, and a list of every setting.
+- When Budget it is updated, a page left open on your phone says "A new version of Budget it is ready" with a Reload button.
+- On an iPhone Home Screen Budget it opens like an app with its own name, and the status bar matches light and dark mode.
+- The assistant's "safe to spend" answer also comes as data (`safe`, `perDay`, `until`, `currency`, `bills`), so other apps like Home it can show it.
+
+### Improved
+- New bank connections ask for up to two years of history (was 180 days). Only the last 14 days land in "New from your bank".
+- Each bank shows when it was last updated.
+- Before a new bank connection on Plaid's production plan, Budget it says how many of your 10 connections are left, and that removing a bank doesn't give one back.
+- A change you made offline that the laptop refuses is now shown to you instead of vanishing, and a change that keeps failing is set aside after 3 tries so the rest still go through.
+- Signing out clears the phone's saved copy of your budget and any unsent changes (it asks first).
+- A sign-in you keep using stays signed in: 90 days from the last day you used it, not from the day you signed in.
+- Signing in through a link, including Google, returns you to where you were going.
+- After a change, your assistant names the currency, and every tool that changes something tells the assistant to check with you first.
+- When you send a charge to Split it, Budget it reads your share from Split it's numbers when Split it sends them.
+- Backups written to a file are written as they go, one receipt photo at a time, so a big backup doesn't need a lot of memory.
+- The owner's page warns from 90% disk full.
+- With no Plaid keys, Home's "Get started" puts "Add an account by hand" first. The README now starts with CSV import and accounts by hand, with Plaid as the extra, and explains `PLAID_REDIRECT_URI`, the 10-connection limit, and trying Sandbox first.
+- The README has a new "Running behind a proxy (Coolify, Traefik, Cloudflare tunnel)" section and a "Restoring a backup from the terminal" section for files over Cloudflare's 100 MB upload limit.
+- New settings: `TZ` (reminders and "today" follow it; the Docker image now includes time zones), `TRUSTED_PROXY`, and `SPLIT_IT_URL`.
+- The website and README say what it costs to run: about $70 a month for Budget it and Split it together, and linking bank accounts costs extra on top of that.
+- A disconnected bank's account still counts in net worth but shows "last known", and is left out of safe to spend and the low-chequing heads-up.
+- Removing or replacing a receipt photo can be undone; the photo file goes once Undo can't bring it back.
+- Keyboard use: focus rings on search, quick add, amount boxes and the sign-in and join pages; the receipt button works with a keyboard; Tab inside a sheet reaches every toggle and text box.
+- The Accounts page names the same assistants as Settings and has a Set up button, and a bank that needs signing in again says so in full.
+- Picking several charges reads "Tag 3 charges" and "Move 3 charges to", the search box hint is shorter, and quotes and apostrophes are curly throughout.
+- When the laptop can't be reached, sheets say "Couldn't reach the laptop. Check your connection and try again." instead of "Failed to fetch".
+- Removing a receipt photo, and signing someone out on the owner's page, take a second tap.
+- Assistants understand "today", "yesterday", "this month", "last month", month names and "last year", and amounts written as text like "$1,200".
+- Assistants: every answer says its currency, foreign charges show their own currency too, and empty results get plain answers.
+- Assistants see your own category names, including ones you renamed or added.
+- `install.sh` refuses to run as root, keeps `budget-it.env` private on every run, installs curl if it's missing, and its self-check never uses your real settings.
+- `budget-it.env.example` lists every setting.
+- The Docker image can't change its own files, its health check follows `PORT`, and `.dockerignore` keeps tests and backups out of it.
+- Changes made offline still work after the app is reopened offline, and show straight away; the app opens offline even right after its first use.
+- When the laptop is off or asleep, the phone shows your last copy and keeps your changes until it's back, instead of an error page, and catches up by itself when it's back.
+- Changes made offline are never saved twice, even if the connection drops just as they're sent.
+- Much faster with a big budget: with 5 years and 25,000 charges, opening drops from about 3 seconds to 0.3, a 5,000-row CSV import from about a minute to under a second, and a bank update from 3 seconds to 0.3.
+- Turning on notifications sends "Notifications are on" only to that phone.
+
+### Fixed
+- Behind a proxy (Coolify, Traefik, a Cloudflare tunnel), five wrong passwords from anyone locked everyone out of signing in for 15 minutes. Each visitor now has their own limit.
+- Someone guessing at your name can no longer lock you out; your sign-in just slows down for a bit.
+- After about 500 apps registered, no new AI assistant could ever connect. Apps that never finished signing in are now cleared after a day.
+- An assistant that retried after a slow reply could add the same cash purchase or goal twice. The same add within 2 minutes is now answered "Already added a moment ago".
+- A full or failing disk no longer stops the app. The change that couldn't be saved says so, it's retried, and the owner sees a warning.
+- Restore checks every file before replacing anything, so a wrong file can't break the app.
+- A test that hung now and then is fixed.
+- CSV import: two identical charges in one file both come in, and importing the same file again still adds nothing.
+- CSV import: impossible dates and amounts are skipped instead of saved broken, and "25/12/2026" is read as day/month.
+- Amounts of a billion or more are refused everywhere you type an amount, and cash with a date that doesn't exist uses today.
+- A bill charged on the 31st one month and the 1st the next is found as a bill, and bills due on the 1st (like rent) get their evening reminder.
+- "Tomorrow" for reminders is right on the evening before the clocks change.
+- When the bank takes back a charge you had split, the split-off part goes too, and a broken transfer gets its category back.
+- Undo after a bank update or a disconnect can no longer bring back an older budget and lose charges.
+- Disconnecting a bank while it was updating can't reconnect its accounts.
+- Removing one of your own categories moves your bills in it too.
+- Deleting an account a goal followed keeps the goal's saved amount in home money.
+- Changing your home currency converts each account's past charges too.
+- Sample data is no longer shared with everyone on the laptop.
+- Restoring a backup from before 1.1 turns "shared with everyone" into the people who are here.
+- One person's budget that can't be worked out no longer stops everyone else's reminders.
+- A mistyped range in `TRUSTED_PROXY` is skipped instead of stopping Budget it from starting.
+- Broken sign-in requests from an assistant get a clear refusal instead of an error.
+- An assistant can add the same cash purchase twice on purpose when you really bought it twice.
+- Invite links end when the person who sent them deletes their account.
+- A damaged or oversized backup is refused with a plain message.
+- Activity no longer scrolls sideways on a phone, the guide's speech bubble no longer covers its face on a laptop, and month names in a category's trend are no longer cut off.
+- Split it groups show by their real names, and sending works with Split it 2.2 (it puts group names in quotes).
+- Sending a charge to a Split it trip group in another currency works: Budget it says the amount is in your home currency with no card fee.
+- "Count only my share" is right when Budget it and Split it use different currencies.
+- Sending a charge again doesn't count your share twice, and a look-alike charge Split it didn't add isn't marked as sent.
+- "Send again" after "count only my share" sends the whole charge.
+- Assistants: amounts show in your own home currency, not always dollars, and holdings in their account's currency.
+- Assistants: "12,50", impossible dates, past goal dates, empty goal names and budgets for Income or Transfer are refused with a clear message instead of guessed.
+- After updating from 1.0, assistant keys older than 90 days keep working (1.0 never recorded when a key was used, so they'd have been switched off).
+- A backup taken from the terminal while the app runs includes the latest changes.
+- Laptop commands work after the app was killed or the power went out (a leftover lock file said it was still running).
+- An empty `TZ=` line no longer switches the app to UTC, and a `PORT` in `budget-it.env` is no longer overridden by the systemd service.
+- The example settings no longer set `PUBLIC_URL` to a made-up address that sent assistant sign-ins nowhere; `install.sh` clears it from existing installs.
+- SECURITY.md and README wording matches v1.1.0 (shared accounts, links).
+- Budget it reads Split it's group list from its data when Split it 2.2 sends it.
+- Notifications the laptop had lost (after a restore, or when the phone renewed them) start working again by themselves.
+- A change made offline that couldn't be saved says what it was, instead of "Saved".
+- A push service that doesn't answer no longer holds up notifications (it gives up after 10 seconds), and phones signed up with an old notification key are dropped instead of failing on every send.
 
 ### Security
-- Keys and sign-ins are only ever listed and removed by the person they belong to. The list never shows a key itself.
+- Changes sent to Budget it from another website are refused.
+- Sign-in tokens are stored hashed, so a copied backup can't be used to sign in. Existing sign-ins keep working.
+- Changing your email needs your current password or a sign-in code.
+- The Split it address can no longer be used to make the laptop call things on its own network. Set `SPLIT_IT_URL` for a Split it on the same laptop or home network.
+- Copies off the laptop leave out the bank key until `BACKUP_PASSPHRASE` is set, and the owner's page says so.
+- A damaged or unreadable bank key stops the app with a clear message instead of being replaced, which would have broken every bank connection.
+- Assistant keys and sign-ins unused for 90 days stop working (sign-ins used to last a year). One address can register at most 20 assistant apps an hour.
+- Names and notes from people and banks are passed to assistants as quoted data, never as instructions.
+- CSV exports can't carry spreadsheet formulas.
+- A shared account was visible to every login on the laptop. Now only the people you picked see it.
+- The README and website say exactly who sees what: Plaid sees the bank data it fetches, a connected assistant sees what it asks for, Cloudflare carries the traffic if you use a tunnel, and whoever runs the laptop can read everything.
+- Backup copies that aren't locked with a passphrase never include the bank key, even from before a bank was connected.
+- Wrong-password and sign-up limits count a whole IPv6 network as one visitor, so hopping addresses doesn't get around them.
+- The assistant sign-in page never sends you on to another site before you've seen where it goes.
+- Tighter limits on what an assistant app can register, and at most 50 calls in one batch.
+- `data/oauth.json` is readable only by the laptop's user, and a `?key=` in an assistant's link never ends up in the log.
+- Person ids like `__proto__` are refused on the owner's page and when sharing an account.
+- Friend requests and friend links notify someone at most once an hour.
+- Signing out turns off that phone's notifications and clears its cached receipt photos.
+
+### Known issues
+- Anyone using a Split it on the same laptop (like `http://localhost:8080`) needs to add `SPLIT_IT_URL` to `budget-it.env` and restart; the error message says what to add.
+- A disconnected bank's balance is its last known one until you reconnect it.
 
 ## v1.0.0 · November 9, 2026
 

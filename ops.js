@@ -4,7 +4,8 @@
 (function (root) {
   'use strict';
   function makeOps(B, { today, rid, sample }) {
-    const num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(/[$,\s]/g, '')); return isFinite(n) ? B.round2(n) : NaN; };
+    // A billion or more is a typo (or "1e300"), not an amount: it would only turn totals into nonsense
+    const num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(/[$,\s]/g, '')); return isFinite(n) && Math.abs(n) < 1e9 ? B.round2(n) : NaN; };
     const text = (v, max = 80) => String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
       const okCat = c => B.CAT_IDS.includes(c);
     const bad = msg => { throw Object.assign(new Error(msg), { status: 400 }); };
@@ -30,7 +31,7 @@
         if (a.note !== undefined) t.note = text(a.note, 140);
         if (a.tags !== undefined) { const tg = tagsOf(a.tags); if (tg.length) t.tags = tg; else delete t.tags; }
         if (a.hidden !== undefined) { if (a.hidden) t.hidden = true; else delete t.hidden; }
-        t.fresh = false;
+        t.fresh = false; delete t.changed;   // saving it is checking it, after the bank changed its amount
         if (a.rule) addRule(s, B.ruleName(t.m), t.c);
         return a.rule ? `Saved. ${B.ruleName(t.m)} goes in ${B.catName(t.c)} from now on.` : a.hidden ? 'Hidden. It won’t count in your totals.' : 'Saved';
       },
@@ -47,14 +48,14 @@
         return `Changed ${n} transaction${n === 1 ? '' : 's'}`;
       },
       'txn.receipt'(s, a) { const t = find(s, a.id); if (a.receipt) t.receipt = text(a.receipt, 2e6); else delete t.receipt; return a.receipt ? 'Receipt added' : 'Receipt removed'; },
-      'txn.sent'(s, a) { const t = find(s, a.id); t.sentTo = text(a.to, 60); return ''; },
+      'txn.sent'(s, a) { const t = find(s, a.id); t.sentTo = text(a.to, 60); if (a.ref) t.sentRef = text(a.ref, 60); return ''; },
       // Sent to Split it with "count only my share": the part housemates owe back becomes its own line that isn't spending.
       'txn.share'(s, a) {
         const t = find(s, a.id), amt = num(a.amount);
         if (t.a >= 0 || t.split || !(amt > 0 && amt < -t.a)) return '';
         t.a = B.round2(t.a + amt); t.split = true; t.fresh = false;
         delete t.orig; delete t.norate;
-        const { receipt, pair, sentTo, plaidId, ...rest } = t;
+        const { receipt, pair, sentTo, sentRef, plaidId, ...rest } = t;
         s.txns.push({ ...rest, id: t.id + '-2', a: -amt, c: 'transfer', splitOf: t.id, set: true, owed: text(a.to, 60) || true, note: 'Owed back by housemates' + (a.to ? ' (' + text(a.to, 60) + ')' : '') });
         return `Only your share ($${(-t.a).toFixed(2)}) counts in your budget`;
       },
@@ -67,14 +68,14 @@
         t.a = B.round2(t.a + amt); t.split = true; t.fresh = false;
         delete t.orig; delete t.norate;   // split parts are in home money from here on
         // The second part is its own line: it doesn't take the receipt, the transfer match or the Split it mark with it.
-        const { receipt, pair, sentTo, plaidId, ...rest } = t;
+        const { receipt, pair, sentTo, sentRef, plaidId, ...rest } = t;
         s.txns.push({ ...rest, id: t.id + '-2', a: -amt, c: a.c, splitOf: t.id, set: true });
         return `Moved $${amt.toFixed(2)} to ${B.catName(a.c)}`;
       },
       'txn.add'(s, a) {
         const amt = num(a.amount); if (!(amt > 0)) bad('Enter how much you paid.');
         const c = okCat(a.c) ? a.c : B.pickCat(s, a.m, null);
-        const date = /^\d{4}-\d\d-\d\d$/.test(a.date || '') ? a.date : today();
+        const date = /^\d{4}-\d\d-\d\d$/.test(a.date || '') && B.toDate(a.date) === a.date ? a.date : today();   // never 2026-02-31
         const t = { id: rid('m'), date, acct: 'cash', m: text(a.m) || 'Cash purchase', a: -amt, c, note: text(a.note, 140), manual: true, at: Date.now(), via: a.via || 'app' };
         s.txns.push(t);
         return `Added $${amt.toFixed(2)} to ${B.catName(c)}`;
@@ -129,6 +130,7 @@
         const to = a.to && a.to !== a.id && okCat(a.to) ? a.to : 'shopping';
         let n = 0; for (const t of s.txns) if (t.c === c.id && !t.other) { t.c = to; n++; }
         s.rules.forEach(r => { if (r.cat === c.id) r.cat = to; });
+        (s.myBills || []).forEach(b => { if (b.c === c.id) b.c = to; });
         delete s.budgets[c.id]; if (s.rollover) delete s.rollover[c.id]; if (s.carry) delete s.carry[c.id];
         s.cats = s.cats.filter(x => x !== c); B.useCats(s);
         return `Removed ${c.name}.${n ? ` ${n} transaction${n === 1 ? '' : 's'} moved to ${B.catName(to)}.` : ''}`;
@@ -168,7 +170,10 @@
       'income.set'(s, a) { const v = num(a.amount); if (!(v >= 0)) bad('Enter an amount.'); s.expectIncome = v; return 'Saved'; },
       'account.share'(s, a) {
         const x = s.accounts.find(y => y.id === a.id) || bad('That account isn’t there any more.');
-        x.shared = !!a.shared; return x.shared ? 'Shared with the household' : 'Only you can see it now';
+        // `with`: the people (their ids) who can see it. The server keeps only people who are really here and says who.
+        // `shared: true/false` is the older all-or-nobody switch.
+        x.shared = Array.isArray(a.with) ? [...new Set(a.with.map(v => text(v, 40)).filter(Boolean))].slice(0, 50) : !!a.shared;
+        return x.shared === true || (x.shared && x.shared.length) ? 'Shared' : 'Only you can see it now';
       },
       // Accounts you keep by hand (no bank connection): cash, a credit union Plaid can't reach, a loan.
       'account.add'(s, a) {
@@ -190,10 +195,13 @@
       },
       'account.delete'(s, a) {
         const x = s.accounts.find(y => y.id === a.id && !y.other) || bad('That account isn’t there any more.');
-        if (!x.manual && !x.csv) bad('Disconnect the bank to remove this account.');
+        // A bank account goes only once its bank is disconnected ("Delete this history")
+        if (!x.manual && !x.csv && !x.disconnected) bad('Disconnect the bank to remove this account.');
         const n = s.txns.filter(t => t.acct === x.id).length;
+        for (const t of s.txns) if (t.acct === x.id) unpair(s, t);
+        // A goal that followed it keeps what it had saved, in home money like the goal (a US dollar account's balance isn't)
+        s.goals.forEach(g => { if (g.acct === x.id) { g.saved = B.goalSaved(s, g); delete g.acct; } });
         s.accounts = s.accounts.filter(y => y !== x); s.txns = s.txns.filter(t => t.acct !== x.id);
-        s.goals.forEach(g => { if (g.acct === x.id) { g.saved = Math.max(0, x.bal || 0); delete g.acct; } });
         return `Removed ${x.name}${n ? ` and its ${n} transaction${n === 1 ? '' : 's'}` : ''}`;
       },
       'account.rename'(s, a) { const x = s.accounts.find(y => y.id === a.id) || bad('That account isn’t there any more.'); const n = text(a.name, 40); if (n && n !== x.name) { x.name = n; x.renamed = true; } return 'Saved'; },
@@ -204,6 +212,10 @@
         if (a.home !== old) {   // accounts keep the money they're in: the old home's accounts now say so
           for (const x of s.accounts) if (!x.other) { const c = x.cur || old; if (c === a.home) delete x.cur; else x.cur = c; }
           s.home = a.home; s.rates = {};
+          // So do their charges: back to the money they were in, then into the new home money (1 to 1 until there's a rate,
+          // like a new account's). Cash you added and splits stay as they are, in the numbers you see.
+          const accts = new Set(s.accounts.filter(x => !x.other).map(x => x.id));
+          for (const t of s.txns) if (accts.has(t.acct) && !t.other && !t.split && !t.splitOf) B.reconvert(s, t, t.orig ? t.orig.cur : old);
         }
         return `Totals are in ${a.home} now.`;
       },
@@ -277,11 +289,16 @@
         if (!rows.length) bad('No rows found. Each row needs a date, a description and an amount.');
         let acct = s.accounts.find(x => x.id === a.acct && x.csv);
         if (!acct) { acct = { id: rid('csv'), name: text(a.name, 40) || 'Imported account', inst: 'CSV', type: 'Imported', mask: '', bal: 0, shared: false, csv: true, synced: Date.now() }; s.accounts.push(acct); }
-        const seen = new Set(s.txns.filter(t => t.acct === acct.id).map(t => t.date + '|' + (t.orig ? t.orig.a : t.a) + '|' + B.norm(t.m)));
-        let n = 0;
+        // How many of each day, amount and name are here already. The same file again (or one that overlaps) adds nothing
+        // twice, while two coffees for the same amount on the same day in one file both come in. The key is kept on each
+        // charge, so renaming or splitting it later doesn't make it look new.
+        const key = (d, a, m) => d + '|' + a + '|' + B.norm(m), have = new Map(), used = new Map();
+        for (const t of s.txns) if (t.acct === acct.id && !t.splitOf) { const k = t.csvKey || key(t.date, t.orig ? t.orig.a : t.a, t.m); have.set(k, (have.get(k) || 0) + 1); }
+        let n = 0; const last = B.lastCats(s);   // "the category you used last time", for every row without a pass over everything each
         for (const r of rows) {
-          const k = r.date + '|' + r.a + '|' + B.norm(r.m); if (seen.has(k)) continue; seen.add(k);
-          s.txns.push(B.convertTxn(s, { id: rid('c'), date: r.date, acct: acct.id, m: r.m, a: r.a, c: B.pickCat(s, r.m, r.a > 0 ? 'income' : null), note: '', fresh: true, csv: true }, acct.cur));
+          const k = key(r.date, r.a, r.m), u = (used.get(k) || 0) + 1; used.set(k, u); if (u <= (have.get(k) || 0)) continue;
+          const t = B.convertTxn(s, { id: rid('c'), date: r.date, acct: acct.id, m: r.m, a: r.a, c: B.pickCat(s, r.m, r.a > 0 ? 'income' : null, last), note: '', fresh: true, csv: true, csvKey: k }, acct.cur);
+          s.txns.push(t); B.noteLast(last, t);
           n++;
         }
         s.seenNew = 0;

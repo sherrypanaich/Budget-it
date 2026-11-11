@@ -6,7 +6,13 @@ services:
     container_name: budget-it
     restart: unless-stopped
     ports:
+      # When a tunnel or proxy (Cloudflare, Traefik) is the only way in, use "127.0.0.1:8090:8090" instead,
+      # so nobody on your network can go around it.
       - "8090:8090"
+    environment:
+      # Your time zone: bill reminders, the weekly check-in and "today" use it (containers run on UTC otherwise).
+      # Change it to yours. This line wins over a TZ line in budget-it.env.
+      - TZ=America/Toronto
     volumes:
       - budget-it-data:/data
       # A second place for backups (a USB drive or a synced folder on this computer). Uncomment this line,
@@ -16,7 +22,8 @@ services:
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
-    # Put your Plaid keys and other settings in budget-it.env next to this file (see budget-it.env.example)
+    # Put your Plaid keys and other settings in budget-it.env next to this file (see budget-it.env.example).
+    # "required: false" needs Docker Compose 2.24 or newer; on an older one, delete those two lines and keep "- budget-it.env".
     env_file:
       - path: budget-it.env
         required: false
