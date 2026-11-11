@@ -111,6 +111,7 @@
 - Budget it reads Split it's group list from its data when Split it 2.2 sends it.
 - Notifications the laptop had lost (after a restore, or when the phone renewed them) start working again by themselves.
 - A change made offline that couldn't be saved says what it was, instead of "Saved".
+- A push service that doesn't answer no longer holds up notifications (it gives up after 10 seconds), and phones signed up with an old notification key are dropped instead of failing on every send.
 
 ### Security
 - Changes sent to Budget it from another website are refused.

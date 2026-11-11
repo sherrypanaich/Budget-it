@@ -51,7 +51,7 @@ function vapidHeader(keys, endpoint, contact) {
   return `vapid t=${head}.${claims}.${b64u(sig)}, k=${keys.publicKey}`;
 }
 
-// Returns 'ok', 'gone' (subscription expired, drop it) or 'error'.
+// Returns 'ok', 'gone' (subscription expired or made with another key: drop it) or 'error' (try again later; a timeout counts as this).
 async function sendOne(keys, sub, message, contact) {
   try {
     const r = await fetch(sub.endpoint, {
@@ -60,9 +60,11 @@ async function sendOne(keys, sub, message, contact) {
         'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream',
         TTL: '86400', Urgency: 'normal', Authorization: vapidHeader(keys, sub.endpoint, contact)
       },
-      body: encrypt(sub, JSON.stringify(message))
+      body: encrypt(sub, JSON.stringify(message)),
+      signal: AbortSignal.timeout(10000)   // a push service that hangs must not hold up turning notifications on, or other sends
     });
-    if (r.status === 404 || r.status === 410) return 'gone';
+    // 404/410: the subscription expired. 403: it was made with another sending key (push-keys.json replaced), so it can never work again.
+    if (r.status === 404 || r.status === 410 || r.status === 403) return 'gone';
     if (!r.ok) { console.error('push failed', r.status, (await r.text()).slice(0, 200)); return 'error'; }
     return 'ok';
   } catch (e) { console.error('push failed', e.message); return 'error'; }
