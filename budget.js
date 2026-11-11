@@ -57,6 +57,13 @@
     for (const t of mine(st)) if (t.c === cat && ymOf(t.date) === ym) s -= t.a;
     return round2(s);
   }
+  // spent() for many categories and months at once (the Trends page): one pass instead of one per category and month.
+  // A snapshot: make a new one after a change.
+  function spentBy(st) {
+    const m = new Map();
+    for (const t of mine(st)) { const k = t.c + '|' + ymOf(t.date); m.set(k, (m.get(k) || 0) - t.a); }
+    return (cat, ym) => round2(m.get(cat + '|' + ym) || 0);
+  }
   // A budget's limit this month: the monthly amount, plus last month's leftover when rollover is on.
   function limit(st, cat, ym) {
     const b = (st.budgets || {})[cat] || 0;
@@ -100,7 +107,14 @@
 
   // ---------- categories ----------
   const baseName = m => String(m || '').split(' · ')[0].trim();
-  const norm = m => baseName(m).toLowerCase().replace(/[#*]\s*\d+.*$/, '').replace(/\s+\d{3,}.*$/, '').replace(/[^a-z0-9&' ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  // Bills, alerts and "last time" categories run this over every transaction, and it's the same few hundred names
+  // again and again: each one is worked out once (a 5-year budget went from seconds to milliseconds on Home).
+  const normed = new Map();
+  const norm = m => {
+    const k = typeof m === 'string' ? m : String(m || ''); let v = normed.get(k);
+    if (v === undefined) { v = baseName(k).toLowerCase().replace(/[#*]\s*\d+.*$/, '').replace(/\s+\d{3,}.*$/, '').replace(/[^a-z0-9&' ]+/g, ' ').replace(/\s+/g, ' ').trim(); if (normed.size >= 20000) normed.clear(); normed.set(k, v); }
+    return v;
+  };
   // The part of a name a rule should match: "COSTCO WHOLESALE #551" -> "COSTCO WHOLESALE"
   const ruleName = m => baseName(m).replace(/\s*[#*]\s*\d.*$/, '').replace(/\s+\d{3,}.*$/, '').trim() || baseName(m);
   function ruleCat(rules, name) {
@@ -136,13 +150,18 @@
     return guessCat(name) || (amount > 0 ? 'income' : 'shopping');
   }
   // The category you used last time for this name, so quick add and CSV imports remember.
-  function lastCat(st, name) {
+  // idx (from lastCats) answers it for many names at once, like each row of a CSV file, without a pass over everything per row
+  function lastCat(st, name, idx) {
     const k = norm(name); if (!k) return null;
     let best = null;
-    for (const t of mine(st)) if (norm(t.m) === k && t.c !== 'transfer' && (!best || t.date > best.date)) best = t;
+    if (idx) best = idx.get(k) || null;
+    else for (const t of mine(st)) if (norm(t.m) === k && t.c !== 'transfer' && (!best || t.date > best.date)) best = t;
     return best && CAT_IDS.includes(best.c) ? best.c : null;
   }
-  const pickCat = (st, name, fallback) => ruleCat(st.rules, name) || fallback || lastCat(st, name) || guessCat(name) || 'shopping';
+  // The latest charge for each name; noteLast keeps it up to date as charges are added
+  const noteLast = (idx, t) => { if (t.other || t.hidden || t.c === 'transfer') return; const k = norm(t.m), b = idx.get(k); if (!b || t.date > b.date) idx.set(k, t); };
+  const lastCats = st => { const idx = new Map(); for (const t of mine(st)) noteLast(idx, t); return idx; };
+  const pickCat = (st, name, fallback, idx) => ruleCat(st.rules, name) || fallback || lastCat(st, name, idx) || guessCat(name) || 'shopping';
 
   // ---------- transfers ----------
   // Money leaving one of your accounts and the same amount arriving in another within 4 days is a transfer
@@ -196,7 +215,8 @@
   // What's free until the next payday: money in chequing, minus what you owe on cards, minus bills due before then.
   function safeToSpend(st, today) {
     const p = payday(st, today); if (!p) return null;
-    const own = (st.accounts || []).filter(a => !a.other && !a.csv);
+    // A disconnected bank's balance is only what it was the day it was disconnected, so it isn't counted here
+    const own = (st.accounts || []).filter(a => !a.other && !a.csv && !a.disconnected);
     const cash = round2(own.filter(a => a.type === 'Chequing').reduce((s, a) => s + inHome(st, a), 0));
     const cards = round2(own.filter(a => a.type === 'Credit card').reduce((s, a) => s + Math.min(0, inHome(st, a)), 0));
     const due = upcoming(st, today).filter(b => !b.late && b.due >= today && b.due < p.next && !(b.paid && ymOf(b.due) === ymOf(today)));
@@ -233,11 +253,16 @@
   }
   function toDate(s) {
     s = String(s || '').trim();
-    let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/); if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
-    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); if (m) return `${m[3]}-${pad(m[1])}-${pad(m[2])}`;   // MM/DD/YYYY, as most Canadian bank exports use
-    const d = new Date(s); return isNaN(d) ? null : ymd(d);
+    // Only a day that really is one: "2026-02-30" or a 13th month isn't a date, rather than a row no month ever shows
+    const day = (y, mo, d) => { y = +y; mo = +mo; d = +d; return y >= 1900 && y <= 2200 && mo >= 1 && mo <= 12 && d >= 1 && d <= daysIn(`${y}-${pad(mo)}`) ? `${y}-${pad(mo)}-${pad(d)}` : null; };
+    let m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/); if (m) return day(m[1], m[2], m[3]);
+    // MM/DD/YYYY, as most Canadian bank exports use. DD/MM/YYYY when the first number can't be a month (25/12/2026).
+    m = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})(?:\s|$)/); if (m) return +m[1] > 12 ? day(m[3], m[2], m[1]) : day(m[3], m[1], m[2]);
+    if (!/[a-z]{3}/i.test(s)) return null;   // past here only dates with a month name ("Nov 5, 2026"): "5" or "45231" isn't one
+    const d = new Date(s); return isNaN(d) || d.getFullYear() < 1900 || d.getFullYear() > 2200 ? null : ymd(d);
   }
-  const toNum = s => { s = String(s || '').replace(/[$\s]/g, ''); if (!s) return null; const neg = /^\(.*\)$/.test(s) || /-$/.test(s); s = s.replace(/[()]/g, '').replace(/-$/, '').replace(/,/g, ''); const n = parseFloat(s); return isNaN(n) ? null : (neg ? -n : n); };
+  // Amounts of a billion or more aren't money anyone imports ("1e999" would even be Infinity, then null once saved)
+  const toNum = s => { s = String(s || '').replace(/[$\s]/g, ''); if (!s) return null; const neg = /^\(.*\)$/.test(s) || /-$/.test(s); s = s.replace(/[()]/g, '').replace(/-$/, '').replace(/,/g, ''); const n = parseFloat(s); return !Number.isFinite(n) || Math.abs(n) >= 1e9 ? null : (neg ? -n : n); };
   // Understands: date,description,amount   or   a header row with Date / Description / Amount, or Debit + Credit columns.
   function parseCsv(text) {
     const rows = csvRows(text); if (!rows.length) return [];
@@ -283,13 +308,17 @@
       for (const t of list) { const ym = ymOf(t.date); if (!months.has(ym)) months.set(ym, t); }
       if (months.size < 2) continue;
       const ts = [...months.values()].sort((a, b) => a.date.localeCompare(b.date));
-      const last = ts[ts.length - 1], amts = ts.map(t => -t.a), days = ts.map(t => dayOf(t.date));
+      const last = ts[ts.length - 1], amts = ts.map(t => -t.a);
+      let days = ts.map(t => dayOf(t.date));
       const avg = amts.reduce((s, a) => s + a, 0) / amts.length;
       if (amts.some(a => Math.abs(a - avg) > avg * 0.25)) continue;
+      // Rent on the 31st one month and the 1st the next (weekends, short months) is still about the same day
+      if (Math.max(...days) - Math.min(...days) > 5) days = days.map(x => x <= 5 ? x + 31 : x);
       if (Math.max(...days) - Math.min(...days) > 5) continue;
       if (monthsBetween(ymOf(last.date), ymOf(today)) > 1) continue;   // stopped
       const varies = amts.some(a => Math.abs(a - amts[0]) > 0.009);
-      out.push({ m: baseName(last.m), key: k, n: baseName(last.m), a: round2(varies ? avg : -last.a), d: Math.round(days.reduce((s, x) => s + x, 0) / days.length), acct: last.acct, c: last.c, varies, sub: SUBS.test(last.m) });
+      const d = Math.round(days.reduce((s, x) => s + x, 0) / days.length);
+      out.push({ m: baseName(last.m), key: k, n: baseName(last.m), a: round2(varies ? avg : -last.a), d: d > 31 ? d - 31 : d, acct: last.acct, c: last.c, varies, sub: SUBS.test(last.m) });
     }
     // A known subscription (Netflix, Spotify...) shows up from its first charge in the last 35 days.
     const have = new Set(out.map(b => b.key)), soon = ymd(new Date(new Date(today + 'T12:00:00').getTime() - 35 * 864e5));
@@ -308,23 +337,31 @@
     return out.sort((a, b) => a.d - b.d);
   }
   // Has this bill been charged in month ym?
-  const billPaid = (st, b, ym) => mine(st).some(t => norm(t.m) === (b.mine ? norm(b.n) : b.key) && ymOf(t.date) === ym && t.a < 0);
+  // idx (paidIndex): every name and month with a charge, made once when checking many bills
+  const paidIndex = st => { const idx = new Set(); for (const t of mine(st)) if (t.a < 0) idx.add(norm(t.m) + '|' + ymOf(t.date)); return idx; };
+  const paidIn = (st, b, ym, idx) => idx ? idx.has((b.mine ? norm(b.n) : b.key) + '|' + ym)
+    : mine(st).some(t => norm(t.m) === (b.mine ? norm(b.n) : b.key) && ymOf(t.date) === ym && t.a < 0);
+  const billPaid = (st, b, ym) => paidIn(st, b, ym);
   function upcoming(st, today) {
     const ym = ymOf(today), d = dayOf(today), dim = daysIn(ym);
     const T = new Date(today + 'T12:00:00');
+    let idx = null; const isPaid = (b, ym) => paidIn(st, b, ym, idx = idx || paidIndex(st));
     return bills(st, today).map(b => {
       if (b.every === 'year') {   // a yearly bill you added: due once a year, in its month
         const mo = +b.month || 1;
         let y = T.getFullYear(), due = `${y}-${pad(mo)}-${pad(Math.min(b.d, daysIn(`${y}-${pad(mo)}`)))}`;
-        const paid = ymOf(due) === ym && billPaid(st, b, ym);
+        const paid = ymOf(due) === ym && isPaid(b, ym);
         if (due < today || paid) { y++; due = `${y}-${pad(mo)}-${pad(Math.min(b.d, daysIn(`${y}-${pad(mo)}`)))}`; }
         return { ...b, paid, days: Math.round((new Date(due + 'T12:00:00') - T) / 864e5), late: false, due };
       }
-      const paid = billPaid(st, b, ym), day = Math.min(b.d, dim);
+      const paid = isPaid(b, ym), day = Math.min(b.d, dim);
       const days = paid ? dim - d + Math.min(b.d, daysIn(nextYm(ym))) : day - d;
       return { ...b, paid, days, late: !paid && days < 0, due: paid ? `${nextYm(ym)}-${pad(Math.min(b.d, daysIn(nextYm(ym))))}` : `${ym}-${pad(day)}` };
     }).sort((a, b) => a.days - b.days);
   }
+  // The bills due on one day (tomorrow, for the evening reminder). One already charged this month is due again next
+  // month: rent paid on the 1st is due on the 1st after, the day after the 31st.
+  const dueOn = (st, today, day) => upcoming(st, today).filter(b => b.due === day);
 
   // ---------- goals ----------
   // How much to put away each month to finish by the goal's month (at least one month away).
@@ -369,20 +406,22 @@
   function alerts(st, today) {
     const out = [], T = new Date(today + 'T12:00:00').getTime(), back = n => ymd(new Date(T - n * 864e5)), list = mine(st), seen = new Set(st.dismissed || []);
     const fmt = v => '$' + Math.abs(v).toFixed(2);
+    const byName = new Map();   // every charge by name, once, instead of a pass over everything for each one
+    for (const x of list) if (x.a < 0) { const k = norm(x.m); if (!byName.has(k)) byName.set(k, []); byName.get(k).push(x); }
     for (const t of list) {
       if (t.a >= 0 || t.date < back(3) || ['home', 'transfer', 'income'].includes(t.c) || t.manual) continue;
-      const k = norm(t.m), before = list.filter(x => x !== t && x.a < 0 && norm(x.m) === k && x.date < t.date).map(x => -x.a).sort((a, b) => a - b);
+      const k = norm(t.m), before = (byName.get(k) || []).filter(x => x !== t && x.date < t.date).map(x => -x.a).sort((a, b) => a - b);
       const usual = before.length >= 2 ? before[Math.floor(before.length / 2)] : null;
       if (-t.a >= 150 && (usual ? -t.a > usual * 3 : -t.a >= 400)) out.push({ key: 'big:' + t.id, kind: 'big', id: t.id, title: `${fmt(t.a)} at ${baseName(t.m)}`, body: usual ? `About ${Math.round(-t.a / usual)} times what it usually is. Was this you?` : 'A bigger charge than usual. Was this you?' });
     }
     for (const b of bills(st, today)) {
       if (b.mine) continue;
-      const ts = list.filter(t => norm(t.m) === b.key && t.a < 0).sort((x, y) => x.date.localeCompare(y.date));
+      const ts = (byName.get(b.key) || []).slice().sort((x, y) => x.date.localeCompare(y.date));
       if (b.sub && ts.length && ts[0].date >= back(45)) out.push({ key: 'newsub:' + b.key, kind: 'newsub', title: `New subscription: ${b.n}`, body: `${fmt(b.a)} a month, about ${fmt(b.a * 12)} a year.` });
       if (b.sub && ts.length >= 2) { const a = -ts[ts.length - 1].a, p = -ts[ts.length - 2].a;
         if (a - p >= 0.5 && a > p * 1.03 && ts[ts.length - 1].date >= back(35)) out.push({ key: `up:${b.key}:${ts[ts.length - 1].date}`, kind: 'priceup', title: `${b.n} went up ${fmt(a - p)}`, body: `It's ${fmt(a)} now, was ${fmt(p)}. That's ${fmt((a - p) * 12)} more a year.` }); }
     }
-    const chq = (st.accounts || []).filter(a => !a.other && a.type === 'Chequing' && !a.csv);
+    const chq = (st.accounts || []).filter(a => !a.other && a.type === 'Chequing' && !a.csv && !a.disconnected);
     if (chq.length) {
       const bal = chq.reduce((s, a) => s + inHome(st, a), 0), ids = new Set(chq.map(a => a.id));
       const soon = upcoming(st, today).filter(b => !b.paid && !b.late && b.days <= 7 && (!b.acct || ids.has(b.acct))).reduce((s, b) => s + b.a, 0);
@@ -393,10 +432,13 @@
 
   // ---------- export ----------
   function toCsv(st) {
-    const q = v => { v = String(v ?? ''); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    const q = v => { v = String(v ?? ''); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    // Text that starts like a formula (= + - @, a tab or a return) gets a ' in front, so a spreadsheet shows it
+    // instead of running it. Amounts are numbers and stay as they are.
+    const w = v => { v = String(v ?? ''); return /^[=+\-@\t\r]/.test(v) ? "'" + v : v; };
     const acc = id => ((st.accounts || []).find(a => a.id === id) || { name: id === 'cash' ? 'Cash' : id }).name;
     const rows = mine(st).concat((st.txns || []).filter(t => t.hidden && !t.other)).sort((a, b) => a.date.localeCompare(b.date));
-    return ['Date,Description,Amount,Category,Account,Note,Tags,Counted'].concat(rows.map(t => [t.date, t.m, t.a.toFixed(2), catName(t.c), acc(t.acct), t.note || '', (t.tags || []).join(' '), t.hidden ? 'no' : 'yes'].map(q).join(','))).join('\n') + '\n';
+    return ['Date,Description,Amount,Category,Account,Note,Tags,Counted'].concat(rows.map(t => [t.date, w(t.m), t.a.toFixed(2), w(catName(t.c)), w(acc(t.acct)), w(t.note || ''), w((t.tags || []).join(' ')), t.hidden ? 'no' : 'yes'].map(q).join(','))).join('\n') + '\n';
   }
 
   // Top places money went this month, leaving out home & bills and transfers.
@@ -514,8 +556,8 @@
     if (t.orig) { t.a = t.orig.a; delete t.orig; delete t.norate; }
     return convertTxn(st, t, cur);
   }
-  const api = { CURRENCIES, homeCur, rate, inHome, missingRates, convertTxn, reconvert, plaidBills, holdings, plaidHoldings, worth, noteWorth, worthSeries, payoff, payFor, yearReview, useCats, lastCat, matchTransfers, payday, safeToSpend, goalSaved, tagTotals, week, alerts, toCsv, ruleName, CATS, CAT_IDS, NOT_SPENDING, catName, round2, ymd, ymOf, ymNow, prevYm, nextYm, daysIn, dayOf, monthsBetween,
-    mine, spent, limit, budgeted, totals, perDay, moneyOut, moneyIn, budgetState, budgetStatus,
-    baseName, norm, ruleCat, guessCat, plaidCat, pickCat, parseQuick, csvRows, parseCsv, toDate, bills, billPaid, upcoming, goalMonthly, topMerchants };
+  const api = { CURRENCIES, homeCur, rate, inHome, missingRates, convertTxn, reconvert, plaidBills, holdings, plaidHoldings, worth, noteWorth, worthSeries, payoff, payFor, yearReview, useCats, lastCat, lastCats, noteLast, matchTransfers, payday, safeToSpend, goalSaved, tagTotals, week, alerts, toCsv, ruleName, CATS, CAT_IDS, NOT_SPENDING, catName, round2, ymd, ymOf, ymNow, prevYm, nextYm, daysIn, dayOf, monthsBetween,
+    mine, spent, spentBy, limit, budgeted, totals, perDay, moneyOut, moneyIn, budgetState, budgetStatus,
+    baseName, norm, ruleCat, guessCat, plaidCat, pickCat, parseQuick, csvRows, parseCsv, toDate, bills, billPaid, upcoming, dueOn, goalMonthly, topMerchants };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Budget = api;
 })(typeof window !== 'undefined' ? window : this);

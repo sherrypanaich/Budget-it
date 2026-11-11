@@ -6,6 +6,12 @@ set -euo pipefail
 
 SRC="$(cd "$(dirname "$0")" && pwd)"
 DEST="$HOME/budget-it"
+ME="${USER:-$(id -un)}"
+
+# It runs as you, from your home folder, and starts with your login (systemd --user): never as root.
+if [ "$(id -u)" = 0 ]; then
+  echo "Run this as your normal user, without sudo: bash install.sh (it asks for your password when it needs it)."; exit 1
+fi
 
 # 1. Node.js 22 or newer (older ones no longer get security fixes)
 need_node=1
@@ -15,6 +21,7 @@ fi
 if [ $need_node = 1 ]; then
   if command -v apt-get >/dev/null; then
     echo "Installing Node.js 24..."
+    command -v curl >/dev/null || sudo apt-get install -y curl ca-certificates
     curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
     sudo apt-get install -y nodejs
   else
@@ -26,11 +33,18 @@ echo "Node $(node -v)"
 # 2. Copy the app, keeping any existing data and settings
 mkdir -p "$DEST"
 if [ "$SRC" != "$DEST" ]; then
-  tar -C "$SRC" --exclude=./data --exclude=./budget-it.env --exclude=./.git -cf - . | tar -C "$DEST" -xf -
+  tar -C "$SRC" --exclude=./data --exclude=./budget-it.env --exclude=./.git --exclude=./.claude --exclude=./node_modules -cf - . | tar -C "$DEST" -xf -
 fi
-[ -f "$DEST/budget-it.env" ] || { cp "$DEST/budget-it.env.example" "$DEST/budget-it.env"; chmod 600 "$DEST/budget-it.env"; }
+[ -f "$DEST/budget-it.env" ] || cp "$DEST/budget-it.env.example" "$DEST/budget-it.env"
+chmod 600 "$DEST/budget-it.env"   # it holds your Plaid keys
+# Budget it 1.0's example had a made-up address here, which sent AI assistants and email links nowhere
+sed -i 's|^PUBLIC_URL=https://your-laptop\.your-tailnet\.ts\.net$|PUBLIC_URL=|' "$DEST/budget-it.env"
 echo "App files in $DEST"
-(cd "$DEST" && node --test test/*.test.js >/dev/null 2>&1 && echo "Self-check passed") || echo "Self-check had a problem (cd $DEST && node --test test/*.test.js shows it). Carrying on."
+# The self-check runs on a copy without your settings and data, so your real keys and backup folder are never used
+CHECK="$(mktemp -d)"
+tar -C "$DEST" --exclude=./data --exclude=./budget-it.env -cf - . | tar -C "$CHECK" -xf -
+(cd "$CHECK" && node --test test/*.test.js >/dev/null 2>&1 && echo "Self-check passed") || echo "Self-check had a problem (cd $DEST && node --test test/*.test.js shows it). Carrying on."
+rm -rf "$CHECK"
 
 # 3. Start on boot
 mkdir -p "$HOME/.config/systemd/user"
@@ -38,7 +52,7 @@ cp "$DEST/budget-it.service" "$HOME/.config/systemd/user/"
 systemctl --user daemon-reload
 systemctl --user enable budget-it >/dev/null
 systemctl --user restart budget-it
-sudo loginctl enable-linger "$USER"
+sudo loginctl enable-linger "$ME"
 sleep 1
 systemctl --user --no-pager status budget-it | head -5 || true
 

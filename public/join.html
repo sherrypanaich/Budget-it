@@ -23,6 +23,8 @@ button,.btn{display:flex;align-items:center;justify-content:center;gap:10px;widt
 .btn.alt{background:var(--surface);color:var(--ink)}
 .or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.85rem;margin:18px 0 0}.or::before,.or::after{content:"";flex:1;height:1.5px;background:var(--edge);opacity:.35}
 button:disabled{opacity:.6;cursor:default}
+button:focus-visible,a:focus-visible{outline:3px solid #2a78d6;outline-offset:2px}
+@media (prefers-color-scheme:dark){button:focus-visible,a:focus-visible{outline-color:#6fa8ef}}
 .err{color:var(--owe);margin:12px 0 0;min-height:1.2em}
 .by{margin:-8px 0 14px;font-weight:700;font-size:.8rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .hint{font-size:.82rem;margin:6px 0 0}
@@ -59,7 +61,8 @@ const post = body => fetch('/api/join', { method:'POST', headers:{'Content-Type'
   const r = await post({}).catch(() => null);
   const d = r ? await r.json().catch(() => ({})) : {};
   if (!r || !r.ok) { lead.innerHTML = (d.error || 'Couldn’t check this invite.') + ' Already have an account? <a href="/login">Sign in</a>.'; return; }
-  lead.textContent = `${d.from} invited you to Budget it. Pick a name and password to join. Your budget and banks stay private to you.`;
+  lead.textContent = `${d.from} invited you to Budget it. Pick a name and password to join, and you’re friends with ${d.from} right away. Your budget and banks stay private to you.`;
+  if (d.waiting && d.waiting.name) document.getElementById('n').value = d.waiting.name;   // a name the invite was made for, if any
   fields.hidden = false; document.getElementById('n').focus();
   if (d.google) { document.getElementById('gBox').hidden = false; document.getElementById('gJoin').href = '/auth/google?mode=join&invite=' + encodeURIComponent(token); }
 })();

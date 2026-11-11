@@ -3,9 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#14112A">
-<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#F5F1E8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121019" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Budget it">
 <meta name="application-name" content="Budget it">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -79,6 +80,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 /* quick add */
 .quick{margin-top:14px;background:var(--surface);border:2.5px solid var(--edge);border-radius:14px;box-shadow:4px 4px 0 var(--pop);padding:5px 5px 5px 14px;display:flex;align-items:center;gap:6px}
 .quick input{flex:1;border:0;background:none;padding:10px 0;font-size:1rem;min-width:0;outline:none}
+.quick:has(input:focus-visible),.search:has(input:focus-visible),.amtin:has(input:focus-visible){outline:3px solid var(--c1);outline-offset:2px}
 .qbtn{border:2px solid var(--edge);border-radius:13px;height:40px;width:40px;flex:none;display:grid;place-items:center;background:color-mix(in srgb,var(--hl) 30%,var(--surface));color:var(--ink)}
 .qbtn svg{width:22px;height:22px}
 .qbtn.go{background:var(--hl);color:var(--hl-ink)}
@@ -135,6 +137,7 @@ button.row:active{background:var(--surface2)}
 .btn.primary{background:var(--hl);color:var(--hl-ink)}
 .btn.sm{padding:6px 12px;font-size:.86rem;border-width:2px;box-shadow:2px 2px 0 var(--pop)}
 .btn.block{display:block;width:100%;padding:13px}
+a.btn{text-decoration:none;text-align:center}
 .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
 .sheet .btns{margin-top:0}
 .btns .btn{flex:1}
@@ -171,7 +174,7 @@ button.row:active{background:var(--surface2)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .legend i{width:16px;height:0;border-top:3px solid;display:inline-block}
 /* search + chips */
-.search{display:flex;align-items:center;gap:8px;background:var(--surface);border:2.5px solid var(--edge);border-radius:14px;box-shadow:3px 3px 0 var(--pop);padding:0 12px;margin-top:16px}
+.search{display:flex;align-items:center;gap:8px;min-width:0;background:var(--surface);border:2.5px solid var(--edge);border-radius:14px;box-shadow:3px 3px 0 var(--pop);padding:0 12px;margin-top:16px}
 .search input{flex:1;border:0;background:none;padding:12px 0;outline:none;min-width:0}
 .chips{display:flex;gap:8px;overflow-x:auto;padding:12px 2px 8px;scrollbar-width:none}
 .chip{border:2px solid var(--edge);border-radius:999px;padding:6px 12px;background:var(--surface);font-weight:700;font-size:.86rem;white-space:nowrap}
@@ -231,6 +234,7 @@ label.chk input{width:20px;height:20px;margin-top:2px;accent-color:var(--ink);fl
 .card.mini{padding:14px;display:flex;flex-direction:column;gap:12px;overflow:visible}
 .err{margin:0;font-size:.9rem;font-weight:700;color:var(--bad)}
 .codes{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;font-family:var(--mono);font-size:.95rem}
+.qrbox{display:grid;place-items:center;margin:0 auto;width:min(220px,70vw)}.qrbox svg{width:100%;height:auto;border-radius:12px;border:2.5px solid var(--edge);box-shadow:3px 3px 0 var(--pop)}
 .keyrow{display:flex;gap:10px;align-items:center}.keyrow code{flex:1;font-family:var(--mono);font-size:.84rem;overflow-wrap:anywhere}
 .loose .rt b,.loose .rt small{white-space:normal}
 div.row{cursor:default}
@@ -250,9 +254,11 @@ div.row{cursor:default}
 .rel ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px}
 .ver{display:inline-block;font-family:var(--mono);font-weight:700;font-size:.8rem;background:var(--ink);color:var(--bg);border-radius:6px;padding:2px 8px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tabh) + 26px + env(safe-area-inset-bottom,0px));z-index:40;background:var(--ink);color:var(--bg);border-radius:14px;border:2.5px solid var(--edge);box-shadow:3px 3px 0 var(--hl);padding:9px 9px 9px 16px;display:flex;gap:12px;align-items:center;font-weight:700;width:max-content;max-width:calc(100% - 32px)}
+.toast.newver{top:calc(12px + env(safe-area-inset-top,0px));bottom:auto;z-index:41}
 .toast button{background:var(--hl);color:var(--hl-ink);border:2px solid var(--edge);border-radius:10px;padding:5px 12px;font-weight:800}
 .foot{margin:34px 4px 0;text-align:center;font-size:.8rem;color:var(--muted)}
 @media (max-width:400px){.htext{width:calc(100% - 100px)}.hart{width:112px}.tile{padding:9px 9px}.poster{grid-template-columns:76px minmax(0,1fr)}.poster .t{font-size:1.4rem}}
+.row.noic{grid-template-columns:minmax(0,1fr) auto}
 .row.off{opacity:.55}.row.off .amt{text-decoration:line-through}
 .row.picked{background:color-mix(in srgb,var(--hl) 30%,var(--surface))}
 .tic.pick{border:2.5px solid var(--edge);background:var(--surface);color:var(--ink)}.row.picked .tic.pick{background:var(--hl);color:var(--hl-ink)}
@@ -296,6 +302,7 @@ nav.tabs .brand,.addlbl,nav.tabs .railonly{display:none}
   .hero:not(.plain){padding-top:70px}
   .htext{width:calc(100% - 170px)}
   .hart{width:168px}
+  .speech{right:150px}
   .hero .big{font-size:min(4rem,calc((min(100vw - 172px,860px) - 260px)/(var(--n,6)*.7)))}
   .hero.plain .big{font-size:min(4rem,calc((min(100vw - 172px,860px) - 80px)/(var(--n,6)*.7)))}
   .tiles{gap:14px}.tile{padding:14px 16px}
@@ -324,6 +331,7 @@ nav.tabs .brand,.addlbl,nav.tabs .railonly{display:none}
   .dash.page .col-side>.sec-h:first-child{margin-top:0}
   .hero{min-height:230px}
   .hart{width:190px}
+  .speech{right:172px}
   .htext{width:calc(100% - 190px)}
   .hero .big{font-size:min(4.4rem,calc((min(100vw - 348px,1180px)*.58 - 250px)/(var(--n,6)*.68)))}
   .hero.plain .big{font-size:min(4.2rem,calc((min(100vw - 348px,1180px)*.58 - 70px)/(var(--n,6)*.68)))}
@@ -347,16 +355,16 @@ const B = window.Budget;
 const ART = {}; for (const g of ['luffy', 'hancock']) { ART[g] = {}; for (const m of ['happy', 'calm', 'worried', 'celebrate']) ART[g][m] = `art/${g}-${m}.webp`; }
 const GNAME = { luffy: 'Luffy', hancock: 'Hancock' };
 const LINES = {
- luffy: { happy: ["Shishishi! You're right on track. More meat money later!", "Budget looks great, captain. Let's keep sailing!", "Nothing scary this month. I like it!"],
-  calm: ["We're spending a bit fast. Slow down a little and we're fine!", "A bit ahead of the month. Eat at home a couple of nights?"],
+ luffy: { happy: ["Shishishi! You’re right on track. More meat money later!", "Budget looks great, captain. Let’s keep sailing!", "Nothing scary this month. I like it!"],
+  calm: ["We’re spending a bit fast. Slow down a little and we’re fine!", "A bit ahead of the month. Eat at home a couple of nights?"],
   worried: c => `Uh oh! ${c} is over budget. Move some money from another one?`,
   review: n => `${n} new charge${n > 1 ? 's' : ''} came in from the bank. Check ${n > 1 ? 'them' : 'it'} with me?`,
-  empty: "Connect your bank and I'll keep an eye on the money for you!",
+  empty: "Connect your bank and I’ll keep an eye on the money for you!",
   celebrate: g => `You did it! ${g} is done! Party on the ship tonight!` },
- hancock: { happy: ["Of course you're on budget. I expected nothing less.", "Everything is in order. You may admire your spending now.", "Perfect. As perfect as I am."],
-  calm: ["You're spending a little quickly. I'll allow it, for now.", "Ahead of pace this month. Be careful, darling."],
-  worried: c => `${c} is over budget. Even I can't overlook that.`,
-  review: n => `${n} new charge${n > 1 ? 's are' : ' is'} waiting for you. Don't keep ${n > 1 ? 'them' : 'it'} waiting.`,
+ hancock: { happy: ["Of course you’re on budget. I expected nothing less.", "Everything is in order. You may admire your spending now.", "Perfect. As perfect as I am."],
+  calm: ["You’re spending a little quickly. I’ll allow it, for now.", "Ahead of pace this month. Be careful, darling."],
+  worried: c => `${c} is over budget. Even I can’t overlook that.`,
+  review: n => `${n} new charge${n > 1 ? 's are' : ' is'} waiting for you. Don’t keep ${n > 1 ? 'them' : 'it'} waiting.`,
   empty: 'Connect a bank. I refuse to guess where your money goes.',
   celebrate: g => `${g} is complete! Naturally. Beauty and discipline go together.` } };
 const COLOR = { groceries: '--c3', dining: '--c2', transport: '--c1', home: '--c6', shopping: '--c5', fun: '--c4', health: '--c7', income: '--c3', transfer: '--c8' };
@@ -422,23 +430,37 @@ const byNewest = (a, b) => b.date.localeCompare(a.date) || String(b.id).localeCo
 // ---------- data: the laptop server, or (in the preview) sample data kept in this browser ----------
 let LAPTOP = false, VIEW = null, S = null, TODAY = B.ymd(new Date()), CUR = B.ymOf(TODAY), PREV = B.prevYm(CUR);
 let demoUndo = [], DEMO_OPS = null, celebrate = null, poke = 0, PRIVATE = false;
-function setView(v) { VIEW = v; S = v.state; B.useCats(S); TODAY = v.today; CUR = B.ymOf(TODAY); PREV = B.prevYm(CUR); if (!months().includes(month)) month = CUR; }
+function setView(v) { VIEW = v; S = v.state; B.useCats(S); TODAY = v.today; CUR = B.ymOf(TODAY); PREV = B.prevYm(CUR); if (!months().includes(month)) month = CUR; if (LAPTOP) seeVersion(v.version); }
+// A page left open on a phone keeps running its old code after the laptop is updated. Once the laptop answers
+// with a newer version, offer a reload, so old code never goes on making changes to a newer budget for long.
+let PAGE_VER = null;
+function seeVersion(v) {
+  if (!v) return; if (!PAGE_VER) { PAGE_VER = v; return; }
+  if (v === PAGE_VER || document.getElementById('newVer')) return;
+  const d = document.createElement('div'); d.id = 'newVer'; d.className = 'toast newver'; d.setAttribute('role', 'status');
+  d.innerHTML = `<span>A new version of Budget it is ready (v${esc(v)}).</span><button type="button">Reload</button>`;
+  d.querySelector('button').onclick = () => location.reload();
+  document.body.appendChild(d);
+}
 const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 PRIVATE = !!store.get('bi-private');
 async function boot() {
+  let swCopy = null;
   try {
     if (window.BI_PREVIEW) throw new Error('preview');
     const r = await fetch('/api/state', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
-    if (r.status === 401) { location.href = '/login'; return; }
+    if (r.status === 401) { try { localStorage.removeItem('bi-view'); } catch {} try { navigator.serviceWorker?.controller?.postMessage('clear-data'); } catch {} location.href = /(?:^#|&)add=/.test(location.hash) ? '/login?next=' + encodeURIComponent('/' + location.hash) : '/login'; return; }   // a friend link waits through signing in
     if (!r.ok || !/json/.test(r.headers.get('content-type') || '')) throw new Error('no laptop');
+    // the service worker's copy, from when the laptop last answered: the one saved here can be newer (changes made offline)
+    if (r.headers.get('X-From-Cache')) { swCopy = await r.json().catch(() => null); throw new Error('offline'); }
     LAPTOP = true; setView(await r.json());
     store.set('bi-view', VIEW);
     live(); flushQueue();
     history.replaceState({ bi: 'page', tab: 'home', sub: null }, '');
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
   } catch (e) {
-    const cached = store.get('bi-view');
-    if (cached && !window.BI_PREVIEW && cached.me) { LAPTOP = true; setView(cached); toast('You’re offline. This is what you had last time.', false); }
+    const cached = store.get('bi-view') || swCopy;
+    if (cached && !window.BI_PREVIEW && cached.me) { LAPTOP = true; setView(cached); live(); toast(navigator.onLine === false ? 'You’re offline. This is what you had last time.' : 'Can’t reach the laptop right now. This is what you had last time.', false); }
     else if (!(window.BI_PREVIEW && await cloudBoot())) demoBoot();
     if (!S) return;
   }
@@ -448,7 +470,10 @@ async function boot() {
   // back from a bank's own app or site: pick the connection up where it left off
   const came = new URLSearchParams(location.search);
   if (LAPTOP && came.get('bank') === 'back') { came.delete('bank'); history.replaceState(history.state, '', '/'); openLink(null, '?' + came.toString()); }
+  if (LAPTOP && navigator.onLine !== false) { useFriendLink(); loadFriendReqs(); pushCheck(); }
 }
+// Notifications on here, but the laptop lost them (a restore, or the phone renewed them while the laptop was off): add them back
+async function pushCheck() { try { const sub = await within(pushSub(), 3000); if (sub) await fetch('/api/push/subscribe', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...sub.toJSON(), quiet: true }) }); } catch {} }
 /* ---------- your own budget, saved in your Claude account (the artifact) ----------
    Everything lives in your private space: data/users/<you>/ — nobody else can read it, not even the artifact's owner.
      state            everything except transactions: { k:'s', rev, s:{accounts, budgets, rules, goals, ...} }
@@ -470,7 +495,7 @@ async function cloudBoot() {
   if (!st) { document.getElementById('view').innerHTML = `<div class="empty" style="margin-top:30vh;flex-direction:column;text-align:center"><span><strong>Couldn’t open your budget</strong>Check your connection, then try again.</span><div class="btns" style="justify-content:center"><button class="btn primary" type="button" onclick="location.reload()">Try again</button></div></div>`; return true; }
   CLOUD = true; TODAY = B.ymd(new Date());
   DEMO_OPS = window.makeBudgetOps(B, { today: () => TODAY, rid: p => p + Math.random().toString(16).slice(2, 10), sample: window.budgetSample });
-  setView({ me: { id: uid, name: name.split(' ')[0] || 'there', owner: true }, today: TODAY, version: '1.0.0', plaid: { configured: false, env: 'sandbox' }, items: [], cloud: true, state: st });
+  setView({ me: { id: uid, name: name.split(' ')[0] || 'there', owner: true }, today: TODAY, version: '1.1.0', plaid: { configured: false, env: 'sandbox' }, items: [], cloud: true, state: st });
   if (B.noteWorth(S, TODAY)) cloudSave();
   // Open on a second device too: when the other one saves, this one catches up.
   CCOL.doc('state').onSnapshot(sn => {
@@ -533,7 +558,7 @@ function demoBoot() {
   TODAY = B.ymd(new Date());
   let st = store.get('bi-demo-v1');
   if (!st || st.day !== TODAY) st = { day: TODAY, state: { hiddenBills: [], seenNew: 0, ...window.budgetSample(TODAY) } };
-  setView({ me: { id: 'demo', name: 'Sherry', owner: true }, today: TODAY, version: '1.0.0', plaid: { configured: false, env: 'sandbox' }, items: [], demo: true, state: st.state });
+  setView({ me: { id: 'demo', name: 'Sherry', owner: true }, today: TODAY, version: '1.1.0', plaid: { configured: false, env: 'sandbox' }, items: [], demo: true, state: st.state });
 }
 async function api(op, args, quiet) {
   if (!LAPTOP) {
@@ -555,26 +580,75 @@ function queueOp(op, args, quiet) {
   if (op === 'undo' || op === 'csv.import') { toast('You’re offline. Try that again when you have signal.', false); return false; }
   LOCAL_OPS = LOCAL_OPS || window.makeBudgetOps(B, { today: () => TODAY, rid: p => p + 'q' + Math.random().toString(16).slice(2, 10), sample: window.budgetSample });
   let msg; try { msg = LOCAL_OPS.OPS[op](S, args || {}); } catch (e) { toast(e.message, false); return false; }
-  const qd = store.get('bi-queue') || []; qd.push({ op, args }); store.set('bi-queue', qd); store.set('bi-view', VIEW);
+  // whose change it is (a phone can be shared) and what it was, in words, in case the laptop says no later
+  const qd = store.get('bi-queue') || []; qd.push({ op, args, uid: VIEW.me.id, what: msg && !/^(Saved|Done)\.?$/.test(msg) ? msg : opWords(op), tries: 0, qid: Date.now().toString(36) + Math.random().toString(36).slice(2, 10) }); store.set('bi-queue', qd); store.set('bi-view', VIEW);
   render(); if (!quiet) toast((msg ? msg + '. ' : '') + 'Saved on this phone, it goes to the laptop when you’re back online.', false);
   return true;
 }
+const OP_NOUN = { txn: 'a charge', budget: 'a budget', goal: 'a goal', bill: 'a bill', rule: 'a rule', cat: 'a category', account: 'an account', holding: 'a holding', money: 'your currencies', income: 'your income', review: 'reviewing new charges', alert: 'a heads-up', guide: 'your guide', sample: 'the sample data' };
+const opWords = op => 'A change to ' + (OP_NOUN[String(op).split('.')[0]] || 'your budget');
+// Sends the changes made offline, in order. One the laptop refuses (say, that charge is gone now) is shown, never just dropped.
+// One that keeps failing for another reason waits a turn, and after 3 tries is set aside so it can't hold up the rest.
+// A 5xx page that isn't the app's own answer comes from the tunnel or proxy in front of it: the laptop is off or asleep.
+const unreachable = r => r.status >= 500 && !/json/.test(r.headers.get('content-type') || '');
+let flushing = false;
 async function flushQueue() {
-  const qd = store.get('bi-queue') || []; if (!qd.length || !LAPTOP || !navigator.onLine) return;
+  if (flushing || !LAPTOP || !navigator.onLine || !(store.get('bi-queue') || []).length) return;
+  flushing = true;
+  // someone else's, from before a sign-in here ran out: never sent as you, kept for when they're back
+  const all = store.get('bi-queue') || [], others = all.filter(x => x.uid && x.uid !== VIEW.me.id), qd = all.filter(x => !others.includes(x)), refused = [], aside = store.get('bi-aside') || [];
   let sent = 0;
-  for (const x of qd) {
-    let r; try { r = await fetch('/api/op', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(x) }); } catch { break; }
-    if (r.status === 401) { location.href = '/login'; return; }
-    sent++;   // a change the laptop refused (say, that charge is gone now) is dropped rather than blocking the rest
-  }
-  store.set('bi-queue', qd.slice(sent));
-  if (sent) { await refresh(true); toast(`Sent ${sent} change${sent === 1 ? '' : 's'} you made offline`, false); }
+  try {
+    while (qd.length) {
+      const x = qd[0];
+      let r, j = {};
+      // qid: if the answer is lost after the laptop saved it, sending it again doesn't make it twice
+      try { r = await fetch('/api/op', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: x.op, args: x.args, qid: x.qid }) }); j = await r.json().catch(() => ({})); }
+      catch { break; }   // still no connection: try again later
+      if (r.status === 401) { location.href = '/login'; return; }   // kept for after signing in again
+      if (unreachable(r)) break;   // the laptop is off or asleep: not its answer, so not a try
+      if (r.ok) { qd.shift(); sent++; continue; }
+      const why = j.error || 'the laptop said no';
+      if (r.status >= 400 && r.status < 500 && r.status !== 408 && r.status !== 429) { qd.shift(); refused.push({ what: x.what || opWords(x.op), why }); continue; }
+      x.tries = (x.tries || 0) + 1; x.why = why;
+      if (x.tries < 3) break;   // the laptop is having trouble: keep the order and try again later
+      qd.shift(); aside.push(x); refused.push({ what: x.what || opWords(x.op), why, aside: true });
+    }
+  } finally { store.set('bi-queue', [...others, ...qd]); store.set('bi-aside', aside); flushing = false; }
+  if (sent || refused.length) await refresh(true);
+  if (refused.length) offlineRefused(refused, sent);
+  else if (sent) toast(`Sent ${sent} change${sent === 1 ? '' : 's'} you made offline`, false);
 }
-window.addEventListener('online', () => flushQueue());
+function offlineRefused(list, sent) {
+  const lines = list.map(x => `This change you made offline couldn’t be saved: ${x.what} (${x.why})${x.aside ? '. It’s set aside after 3 tries.' : '.'}`);
+  if (document.getElementById('layer').innerHTML) return toast(lines.join(' '), false);
+  const aside = store.get('bi-aside') || [];
+  sheet(`<h3>${list.length === 1 ? 'A change didn’t save' : list.length + ' changes didn’t save'}</h3>
+  ${sent ? `<p style="margin:-6px 0 0">${sent} other change${sent === 1 ? '' : 's'} you made offline went through.</p>` : ''}
+  <p class="warnbox">${lines.map(esc).join('<br>')}</p>
+  <div class="btns">${aside.length ? '<button class="btn primary" type="button" id="qAgain">Try the set-aside ones again</button><button class="btn" type="button" id="qForget">Forget them</button>' : ''}<button class="btn" type="button" data-close>OK</button></div>`, root => {
+    const again = root.querySelector('#qAgain'), forget = root.querySelector('#qForget');
+    if (again) again.onclick = () => { store.set('bi-queue', [...(store.get('bi-queue') || []), ...aside.map(x => ({ ...x, tries: 0 }))]); store.set('bi-aside', []); close(); flushQueue(); };
+    if (forget) forget.onclick = () => { store.set('bi-aside', []); close(); toast('Forgot those changes', false); };
+  });
+}
+// Signing out leaves nothing of this budget on the phone: the saved view, unsent changes and the offline copy.
+async function signOut(url, done) {   // done: already signed out at the laptop, so there's nothing to ask
+  const unsent = (store.get('bi-queue') || []).length;
+  if (unsent && !done && !confirm(`${unsent} change${unsent === 1 ? '' : 's'} you made offline ${unsent === 1 ? 'hasn’t' : 'haven’t'} reached the laptop yet. Sign out anyway and lose ${unsent === 1 ? 'it' : 'them'}?`)) return;
+  for (const k of ['bi-view', 'bi-queue', 'bi-aside']) try { localStorage.removeItem(k); } catch {}
+  try { navigator.serviceWorker?.controller?.postMessage('clear-data'); } catch {}
+  // and this phone stops getting your notifications: their words have your amounts in them, for anyone holding it
+  try { const sub = await within(pushSub(), 1500); if (sub) await within(Promise.all([post('/api/push/unsubscribe', { endpoint: sub.endpoint }, true), sub.unsubscribe()]), 2500); } catch {}
+  try { await within(caches.delete('budget-it-data-v1'), 1500); } catch {}   // the same offline copy, from here, in case the worker is asleep
+  location.href = url || '/api/logout';
+}
+window.addEventListener('online', () => { flushQueue(); refresh(); });
 async function post(url, body, quiet, op, canQueue) {
   let r, j = {};
   try { r = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }); j = await r.json().catch(() => ({})); }
   catch { if (canQueue) return 'offline'; toast('Couldn’t reach the laptop. Check your connection and try again.', false); return false; }
+  if (unreachable(r)) { if (canQueue) return 'offline'; toast('Couldn’t reach the laptop. It might be off or asleep. Try again in a bit.', false); return false; }
   if (r.status === 401) { location.href = '/login'; return false; }
   if (!r.ok) { toast(j.error || 'That didn’t work. Try again.', false); return false; }
   if (j.state) { setView(j); store.set('bi-view', VIEW); }
@@ -589,12 +663,15 @@ function afterChange(msg, op, quiet) {
 function live() {
   if (!window.EventSource) return;
   const es = new EventSource('/api/events');
-  let t; es.addEventListener('changed', () => { clearTimeout(t); t = setTimeout(refresh, 400); });
+  let t, lost = false; es.addEventListener('changed', () => { clearTimeout(t); t = setTimeout(refresh, 400); });
+  // back after the laptop restarted (an update) or the connection dropped: catch up, and send what waited
+  es.onerror = () => { lost = true; }; es.onopen = () => { if (lost) { lost = false; refresh(); } };
 }
 async function refresh(force) {
   if (!LAPTOP || (!force && document.getElementById('layer').innerHTML)) return;
   if (!force && (store.get('bi-queue') || []).length) return flushQueue();
-  try { const r = await fetch('/api/state', { credentials: 'same-origin' }); if (r.ok) { setView(await r.json()); store.set('bi-view', VIEW); render(); } } catch {}
+  // never the service worker's older copy (X-From-Cache): what's on screen already is at least as new
+  try { const r = await fetch('/api/state', { credentials: 'same-origin' }); if (r.ok && !r.headers.get('X-From-Cache')) { setView(await r.json()); store.set('bi-view', VIEW); render(); } } catch {}
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
 
@@ -610,7 +687,7 @@ const months = () => { const first = S.txns.reduce((m, t) => t.date < m ? t.date
 function mood() {
   const g = S.guide === 'hancock' ? 'hancock' : 'luffy', L = LINES[g], pick = a => a[(+TODAY.slice(8) + poke) % a.length];
   if (celebrate) return { m: 'celebrate', line: L.celebrate(celebrate) };
-  if (!hasData()) return { m: 'happy', line: CLOUD ? (g === 'hancock' ? 'Add your accounts. I refuse to guess where your money goes.' : "Add your accounts and I'll keep an eye on the money for you!") : L.empty };
+  if (!hasData()) return { m: 'happy', line: CLOUD ? (g === 'hancock' ? 'Add your accounts. I refuse to guess where your money goes.' : "Add your accounts and I’ll keep an eye on the money for you!") : L.empty };
   const over = B.budgeted(S).filter(c => B.budgetState(S, c, CUR) === 'over' && c !== 'home');
   if (over.length) return { m: 'worried', line: L.worried(B.catName(over[0])) };
   const nf = fresh().length;
@@ -659,15 +736,19 @@ function home() {
       <p class="hline">${hasData() ? 'Set budgets to see what’s left to spend.' : (CLOUD ? 'Add an account or import a CSV to get started.' : 'Connect a bank or import a CSV to get started.')}</p></div>${guide}</section>`;
   const quick = `<form class="quick" id="quick" autocomplete="off"><input id="qa" placeholder="coffee 4.50" aria-label="Quick add a cash purchase">
     <button class="qbtn go" type="submit" aria-label="Add">${svg('spark', '')}</button></form>
-    <p class="qhint">Paid cash? Type it like "lunch 14.20". Card and bank charges come in by themselves.</p>`;
+    <p class="qhint">Paid cash? Type it like “lunch 14.20”. Card and bank charges come in by themselves.</p>`;
+  const byHand = CLOUD || (LAPTOP && !VIEW.plaid.configured);   // no Plaid keys on this laptop: start by hand or with a CSV
   if (!hasData()) return head + hero + quick + sec('Get started') + `<div class="card">
-    <button class="needs" type="button" data-act="${CLOUD ? 'addacct' : 'plaid'}"><span class="n">1</span><span><b>${CLOUD ? 'Add an account by hand' : 'Connect your bank'}</b><small>${CLOUD ? 'Chequing, savings, a card or cash, with today’s balance' : 'Balances and charges come in by themselves, read only'}</small></span>${chev}</button>
+    <button class="needs" type="button" data-act="${byHand ? 'addacct' : 'plaid'}"><span class="n">1</span><span><b>${byHand ? 'Add an account by hand' : 'Connect your bank'}</b><small>${byHand ? 'Chequing, savings, a card or cash, with today’s balance' : 'Balances and charges come in by themselves, read only'}</small></span>${chev}</button>
     <button class="needs" type="button" data-act="csv"><span class="n">2</span><span><b>Or import a CSV</b><small>From your bank’s website, for banks Plaid can’t reach</small></span>${chev}</button>
     <button class="needs" type="button" data-act="sample"><span class="n">3</span><span><b>Or look around with sample data</b><small>Made-up accounts and spending. Remove it any time.</small></span>${chev}</button></div>`;
   const watch = B.budgetStatus(S, CUR, TODAY).filter(b => b.cat !== 'home' && b.state !== 'ok').sort((a, b) => b.spent / b.limit - a.spent / a.limit);
   const needs = [];
   if (nf) needs.push(`<button class="needs" type="button" data-act="review"><span class="n">${nf}</span><span><b>New from your bank</b><small>Check the category on ${nf} new charge${nf > 1 ? 's' : ''}</small></span>${chev}</button>`);
-  for (const it of VIEW.items.filter(i => i.error)) needs.push(`<button class="needs" type="button" data-fix="${esc(it.id)}"><span class="n" style="background:var(--bad);color:#fff">!</span><span><b>${esc(it.inst)} needs you</b><small>${it.error === 'login' ? 'Sign in to your bank again to keep it updating' : esc(it.error)}</small></span>${chev}</button>`);
+  const on = VIEW.ownerNotes || {};
+  if (on.recovered || on.disk) needs.push(`<button class="needs" type="button" data-act="ownernote"><span class="n" style="background:var(--bad);color:#fff">!</span><span><b>${on.recovered ? 'Budgets were put back from a copy' : 'The laptop’s disk needs you'}</b><small>${on.recovered ? `db.json was damaged, so ${esc(on.recovered.from)} was used` : esc(on.disk)}</small></span>${chev}</button>`);
+  for (const it of VIEW.items.filter(i => i.error)) needs.push(`<button class="needs" type="button" data-fix="${esc(it.id)}"><span class="n" style="background:var(--bad);color:#fff">!</span><span><b>${esc(it.inst)} ${it.error === 'login' ? 'needs you to sign in again' : 'needs you'}</b><small>${it.error === 'login' ? 'Tap to reconnect. Last updated ' + ago(it.syncedAt) : esc(it.error)}</small></span>${chev}</button>`);
+  for (const t of mineTx().filter(x => x.changed)) needs.push(`<button class="needs" type="button" data-txn="${esc(t.id)}"><span class="n" style="background:var(--bad);color:#fff">!</span><span><b>${esc(t.m)} changed from ${changedAmt(t, 'was')} to ${changedAmt(t, 'now')} after you split it</b><small>Check the split</small></span>${chev}</button>`);
   watch.forEach(x => needs.push(`<button class="needs" type="button" data-bud="${x.cat}"><span class="n" style="${x.state === 'over' ? 'background:var(--bad);color:#fff' : ''}">!</span><span><b>${esc(x.name)} is ${x.state === 'over' ? 'over budget' : Math.round(x.spent / x.limit * 100) + '% used'}</b><small>${x.state === 'over' ? money(-x.left) + ' over' : money(x.left) + ' left for ' + daysLeft + ' days'}</small></span>${chev}</button>`));
   for (const al of B.alerts(S, TODAY).slice(0, 4)) needs.push(`<button class="needs" type="button" data-alert="${esc(al.key)}"><span class="n" style="${al.kind === 'big' || al.kind === 'low' ? 'background:var(--bad);color:#fff' : ''}">${al.kind === 'priceup' ? '↑' : al.kind === 'newsub' ? '+' : '!'}</span><span><b>${esc(al.title)}</b><small>${esc(al.body)}</small></span>${chev}</button>`);
   if (!B.budgeted(S).length) needs.push(`<button class="needs" type="button" data-go="budgets"><span class="n">$</span><span><b>Set your budgets</b><small>Start from what you spent last month</small></span>${chev}</button>`);
@@ -683,7 +764,7 @@ function home() {
   const upH = up.length ? sec('Coming up', '<button class="link" type="button" data-go="plans">Calendar</button>') + `<div class="card">${up.map(b => `<div class="row">${tic(b.c || 'home')}<span class="rt"><b>${esc(b.n)}</b><small>${b.varies ? 'About ' : ''}${money(b.a)} · ${esc(acct(b.acct).name)}</small></span><span class="pill${b.days <= 3 ? ' hl' : ''}">${whenLabel(b)}</span></div>`).join('')}</div>` : '';
   const posterH = top ? `<button class="poster" type="button" data-search="${esc(top.name)}"><span class="ph">${svg(top.cat, '')}</span><span><span class="stamp">BOUNTY</span><span class="t">WANTED</span><span class="who">${esc(top.name)}</span><span class="bounty num">${money(top.total)}</span><span class="p">Took the most money this month, in ${top.count} trip${top.count > 1 ? 's' : ''}. Tap to see them.</span></span></button>` : '';
   const recentH = sec('Recent', '<button class="link" type="button" data-go="activity">See all</button>') + `<div class="card">${recent.map(txnRow).join('') || '<p class="pad muted" style="margin:0">Nothing yet.</p>'}</div>`;
-  const foot = `<p class="foot">Budget it v${esc(VIEW.version)}${VIEW.demo ? ' preview · sample data' : VIEW.cloud ? ' · saved privately to your Claude account' : ''} · <button class="link" type="button" data-act="whatsnew">What's new</button></p>`;
+  const foot = `<p class="foot">Budget it v${esc(VIEW.version)}${VIEW.demo ? ' preview · sample data' : VIEW.cloud ? ' · saved privately to your Claude account' : ''} · <button class="link" type="button" data-act="whatsnew">What’s new</button></p>`;
   if (WIDE()) {
     const bs = B.budgetStatus(S, CUR, TODAY).slice(0, 6);
     const budH = bs.length ? sec('Budgets', '<button class="link" type="button" data-go="budgets">All</button>') + `<div class="card">${bs.map(budRow).join('')}</div>` : '';
@@ -719,7 +800,7 @@ function budgets() {
   <div class="card pad"><div class="row" style="padding:0;border:0">${tic('income')}<span class="rt"><b>${inc ? money(inc, { round: true }) + ' a month' : 'How much comes in?'}</b><small>${S.expectIncome ? 'Your take-home pay' : inc ? `What came in during ${monName(PREV, 1)}` : 'Add your take-home pay to plan it'}</small></span><button class="btn sm" type="button" data-act="income">Change</button></div>
   ${inc ? `<span class="bar" style="margin-top:14px;height:16px"><i style="width:${Math.min(100, planned / inc * 100)}%;background:var(--c6);border-radius:0"></i><i style="left:${Math.min(100, planned / inc * 100)}%;width:${Math.max(0, Math.min(100 - planned / inc * 100, goalsM / inc * 100))}%;background:var(--c1);border-radius:0"></i></span>
   <div class="legend" style="padding:10px 0 0"><span><i style="border-color:var(--c6)"></i>Budgets ${money(planned, { round: true })}</span><span><i style="border-color:var(--c1)"></i>Goals ${money(goalsM, { round: true })}</span><span><i style="border-color:var(--line)"></i>${free >= 0 ? 'No job yet ' + money(free, { round: true }) : 'Over by ' + money(-free, { round: true })}</span></div>
-  ${free > 0 ? `<p class="small muted" style="margin:10px 0 0">${money(free, { round: true })} a month isn't planned. Giving it to a goal gets you there sooner.</p><div class="btns"><button class="btn" type="button" data-go="plans">Pick a goal</button></div>` : free < 0 ? `<p class="small muted" style="margin:10px 0 0">Your budgets and goals add up to more than comes in. Trim a budget or push a goal back.</p>` : ''}` : ''}</div>`, true);
+  ${free > 0 ? `<p class="small muted" style="margin:10px 0 0">${money(free, { round: true })} a month isn’t planned. Giving it to a goal gets you there sooner.</p><div class="btns"><button class="btn" type="button" data-go="plans">Pick a goal</button></div>` : free < 0 ? `<p class="small muted" style="margin:10px 0 0">Your budgets and goals add up to more than comes in. Trim a budget or push a goal back.</p>` : ''}` : ''}</div>`, true);
 }
 
 /* ---------- Plans ---------- */
@@ -784,7 +865,7 @@ function activity() {
   <p class="small muted" style="margin:10px 4px 0">Home &amp; bills, income and transfers are left out so you see everyday spending.</p>` : ''}
 `;
   const mainH = `  ${nf ? `<button class="btn primary block" type="button" data-act="review" style="margin-top:16px">Check ${nf} new charge${nf > 1 ? 's' : ''}</button>` : ''}
-  <div style="display:flex;gap:10px;align-items:center"><label class="search" style="flex:1">${svg('search')}<input id="q" type="search" placeholder="Search a store, note, amount or #tag" value="${esc(q)}" aria-label="Search transactions"></label>
+  <div style="display:flex;gap:10px;align-items:center"><label class="search" style="flex:1">${svg('search')}<input id="q" type="search" placeholder="Store, amount or #tag" value="${esc(q)}" aria-label="Search transactions"></label>
   <button class="btn sm" type="button" data-act="${selecting ? 'selectoff' : 'select'}" style="margin-top:16px">${selecting ? 'Done' : 'Select'}</button></div>
   <div class="chips" role="group" aria-label="Filter by category"><button class="chip" type="button" data-f="all" aria-pressed="${filter === 'all'}">All</button>${B.CATS.map(c => `<button class="chip" type="button" data-f="${c.id}" aria-pressed="${filter === c.id}">${esc(c.name)}</button>`).join('')}</div>
   ${q && list.length ? `<p class="small muted" style="margin:0 4px 8px">${list.length} match${list.length === 1 ? '' : 'es'} in every month, ${money(-list.reduce((s, t) => s + (t.a < 0 && !t.other && !t.hidden && t.c !== 'transfer' ? t.a : 0), 0))} spent.</p>` : ''}
@@ -798,9 +879,10 @@ const SPENDY = () => B.CATS.filter(c => !B.NOT_SPENDING.includes(c.id));
 const avgOf = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0;
 function trends() {
   const ms = months().slice(-12), full = ms.filter(m => m !== CUR), last = full[full.length - 1], before = full.slice(0, -1);
-  const every = m => SPENDY().filter(c => c.id !== 'home').reduce((s, c) => s + B.spent(S, c.id, m), 0), homeOf = m => B.spent(S, 'home', m);
+  const sp = B.spentBy(S);   // every category and month in one pass: Trends asks for a lot of them
+  const every = m => SPENDY().filter(c => c.id !== 'home').reduce((s, c) => s + sp(c.id, m), 0), homeOf = m => sp('home', m);
   const head = `<header class="top"><button class="icon-btn" type="button" data-back aria-label="Back">${svg('back')}</button><h1>Trends</h1></header>`;
-  if (full.length < 2) return head + emptyCard('Trends need a little history', 'They show up once Budget it has a couple of full months. Plaid usually brings in six months when you connect a bank.');
+  if (full.length < 2) return head + emptyCard('Trends need a little history', 'They show up once Budget it has a couple of full months. A bank connected through Plaid usually brings in up to two years.');
   const avgAll = avgOf(full.map(m => every(m) + homeOf(m)));
   // One bar a month: everyday spending on top of home & bills
   const W = 320, H = 170, P = { l: 34, r: 6, t: 18, b: 22 }, n = ms.length, bw = Math.min(30, (W - P.l - P.r) / n * .62);
@@ -814,8 +896,8 @@ function trends() {
     ${[0, max / 2, max].map(v => `<line x1="${P.l}" x2="${W - P.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${P.l - 6}" y="${y(v) + 3.5}" text-anchor="end" font-size="9.5" fill="var(--muted)">$${v >= 1000 ? v / 1000 + 'k' : v}</text>`).join('')}
     ${bars}<line x1="${P.l}" x2="${W - P.r}" y1="${y(avgAll)}" y2="${y(avgAll)}" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="${P.l + 2}" y="${y(avgAll) - 5}" font-size="9.5" font-weight="700" fill="var(--ink)">Usual ${money(avgAll, { round: true })}</text></svg>`;
   // Each category: a usual month, last month, and how last month compared with the months before it
-  const rows = SPENDY().map(c => { const vals = ms.map(m => B.spent(S, c.id, m)), prior = avgOf(before.map(m => B.spent(S, c.id, m))), lastV = B.spent(S, c.id, last);
-    return { c, vals, usual: avgOf(full.map(m => B.spent(S, c.id, m))), prior, lastV, ch: prior > 20 ? (lastV - prior) / prior : null }; })
+  const rows = SPENDY().map(c => { const vals = ms.map(m => sp(c.id, m)), prior = avgOf(before.map(m => sp(c.id, m))), lastV = sp(c.id, last);
+    return { c, vals, usual: avgOf(full.map(m => sp(c.id, m))), prior, lastV, ch: prior > 20 ? (lastV - prior) / prior : null }; })
     .filter(r => r.vals.some(v => v > 0)).sort((a, b) => b.usual - a.usual);
   const spark = vals => { const mx = Math.max(1, ...vals); return `<svg viewBox="0 0 ${vals.length * 8} 24" width="${vals.length * 8}" height="24" aria-hidden="true">${vals.map((v, i) => { const h = Math.max(1.5, v / mx * 22); return `<rect x="${i * 8 + 1}" y="${24 - h}" width="5.5" height="${h}" rx="1.5" fill="var(--ink)" opacity="${i === vals.length - 1 ? .4 : 1}"/>`; }).join('')}</svg>`; };
   const big = rows.filter(r => r.ch !== null && Math.abs(r.ch) >= .2 && Math.abs(r.lastV - r.prior) > 25).sort((a, b) => Math.abs(b.ch) - Math.abs(a.ch)).slice(0, 3);
@@ -872,7 +954,7 @@ function worthChart(nw) {
 function trendSheet(c) {
   const ms = months().slice(-12).reverse();
   sheet(`<h3>${esc(B.catName(c))}</h3><p class="muted" style="margin:-8px 0 0">Tap a month to see its charges.</p><div class="card">${ms.map(m => { const v = B.spent(S, c, m), b = B.limit(S, c, m);
-    return `<button class="row" type="button" data-trendmonth="${m}"><span class="rt"><b>${monName(m, 1)} ${m.slice(0, 4)}</b><small>${m === CUR ? 'So far' : b ? (v <= b ? 'Under budget' : 'Over by ' + money(v - b, { round: true })) : 'No budget'}</small></span><span class="amt">${money(v)}</span></button>`; }).join('')}</div>
+    return `<button class="row noic" type="button" data-trendmonth="${m}"><span class="rt"><b>${monName(m, 1)} ${m.slice(0, 4)}</b><small>${m === CUR ? 'So far' : b ? (v <= b ? 'Under budget' : 'Over by ' + money(v - b, { round: true })) : 'No budget'}</small></span><span class="amt">${money(v)}</span></button>`; }).join('')}</div>
   <div class="btns"><button class="btn" type="button" data-close>Done</button></div>`, root => root.querySelectorAll('[data-trendmonth]').forEach(b => b.onclick = () => { close(); filter = c; q = ''; month = b.dataset.trendmonth; shown = 200; tab = 'activity'; sub = null; render(); scrollTo(0, 0); }));
 }
 
@@ -883,8 +965,8 @@ const units = q => (+q).toLocaleString('en-CA', { maximumFractionDigits: 4 });
 function holdingsCard(a) {
   if (a.type !== 'Investment') return '';
   const h = B.holdings(a), money = (v, o) => curMoney(v, a.cur, o);
-  if (!h.list.length) return a.manual ? `<div class="card pad"><b>Holdings</b><p class="small muted" style="margin:6px 0 10px">Add what you own (VFV, XEQT, a stock) and Budget it keeps this account's balance as their total.</p><button class="btn sm" type="button" id="addhold">Add a holding</button></div>`
-    : `<p class="note">Your bank hasn't shared what this account holds. Only its balance shows.</p>`;
+  if (!h.list.length) return a.manual ? `<div class="card pad"><b>Holdings</b><p class="small muted" style="margin:6px 0 10px">Add what you own (VFV, XEQT, a stock) and Budget it keeps this account’s balance as their total.</p><button class="btn sm" type="button" id="addhold">Add a holding</button></div>`
+    : `<p class="note">Your bank hasn’t shared what this account holds. Only its balance shows.</p>`;
   return `<div class="card holds"><div class="pad" style="padding-bottom:4px"><b>Holdings</b><span class="small muted"> · ${money(h.value)}${h.gain !== null ? ` · <span style="color:var(${h.gain >= 0 ? '--good' : '--bad'})">${h.gain >= 0 ? 'up' : 'down'} ${money(Math.abs(h.gain))} (${Math.abs(h.pct)}%)</span>` : ''}</span></div>
     ${h.list.map(x => `<${a.manual ? 'button type="button"' : 'div'} class="row" data-hold="${esc(x.id)}"><span class="tic rank" style="font-size:.62rem;font-family:var(--body);font-weight:800">${esc((x.sym || x.name).slice(0, 5))}</span><span class="rt"><b>${esc(x.name)}</b><small>${units(x.qty)} × ${money(x.price)}</small></span><span class="amt">${money(x.value)}${x.gain !== null ? `<small style="color:var(${x.gain >= 0 ? '--good' : '--bad'})">${x.gain >= 0 ? '+' : '−'}${Math.abs(x.pct)}%</small>` : '<small>no cost added</small>'}</span></${a.manual ? 'button' : 'div'}>`).join('')}
     ${a.manual ? `<div class="pad" style="padding-top:8px"><p class="small muted" style="margin:0 0 8px">Prices you add don’t update by themselves.${a.priced ? ' Last updated ' + ago(a.priced) + '.' : ''}</p><div class="chips" style="gap:8px"><button class="btn sm" type="button" id="prices">Update prices</button><button class="btn sm" type="button" id="addhold">Add a holding</button></div></div>` : ''}</div>`;
@@ -892,7 +974,7 @@ function holdingsCard(a) {
 // Today's price for each holding, all in one go
 function pricesSheet(acctId) {
   const a = acct(acctId), list = a.holdings || [];
-  sheet(`<h3>Update prices</h3><p class="muted" style="margin:-8px 0 0">${esc(a.name)}. Type today's price of one unit${a.cur ? ' in ' + esc(a.cur) : ''}. Your brokerage app or a search for the symbol shows it.</p>
+  sheet(`<h3>Update prices</h3><p class="muted" style="margin:-8px 0 0">${esc(a.name)}. Type today’s price of one unit${a.cur ? ' in ' + esc(a.cur) : ''}. Your brokerage app or a search for the symbol shows it.</p>
   ${list.map(h => `<label class="f">${esc(h.sym || h.name)}${h.sym && h.name !== h.sym ? ` <span class="muted small" style="font-weight:600">${esc(h.name)}</span>` : ''}<input class="inp" data-price="${esc(h.id)}" inputmode="decimal" value="${h.price}"></label>`).join('')}
   <p class="small" id="pt" aria-live="polite" style="margin:0"></p>
   <div class="btns"><button class="btn primary" type="button" id="ok">Save prices</button><button class="btn" type="button" data-close>Cancel</button></div>`, root => {
@@ -927,7 +1009,7 @@ function accounts() {
   const nw = own.reduce((s, a) => s + hb(a), 0), have = own.filter(a => a.bal > 0).reduce((s, a) => s + hb(a), 0), owe = -own.filter(a => a.bal < 0).reduce((s, a) => s + hb(a), 0);
   const groups = {}; own.forEach(a => { (groups[a.type] = groups[a.type] || []).push(a); });
   const newest = Math.max(0, ...own.map(a => a.synced || 0));
-  const row = a => `<button class="row" type="button" data-acct="${esc(a.id)}">${ticK(a.bal < 0 ? 'lock' : a.csv ? 'file' : 'bank', a.bal < 0 ? '--c7' : '--c1')}<span class="rt"><b>${esc(a.name)}</b><small>${esc(a.inst)}${a.mask ? ' ···' + esc(a.mask) : ''} · ${a.other ? 'Shared by ' + esc(a.owner) : a.shared ? 'Shared with household' : 'Only you'}</small></span><span class="amt">${a.csv ? '' : curMoney(a.bal, a.cur, { abs: true })}<small>${a.csv ? 'imported' : a.cur && B.rate(S, a.cur) ? '≈ ' + money(hb(a), { abs: true, round: true }) + (a.bal < 0 ? ' owing' : '') : a.bal < 0 ? 'owing' : gainLine(a) || 'available'}</small></span></button>`;
+  const row = a => `<button class="row" type="button" data-acct="${esc(a.id)}">${ticK(a.bal < 0 ? 'lock' : a.csv ? 'file' : 'bank', a.bal < 0 ? '--c7' : '--c1')}<span class="rt"><b>${esc(a.name)}</b><small>${esc(a.inst)}${a.mask ? ' ···' + esc(a.mask) : ''} · ${a.disconnected ? 'Disconnected · history kept' : a.other ? 'Shared by ' + esc(a.owner) : sharedLine(a)}</small></span><span class="amt">${a.csv ? '' : curMoney(a.bal, a.cur, { abs: true })}<small>${a.csv ? 'imported' : a.cur && B.rate(S, a.cur) ? '≈ ' + money(hb(a), { abs: true, round: true }) + (a.bal < 0 ? ' owing' : '') : a.disconnected ? 'last known' : a.bal < 0 ? 'owing' : gainLine(a) || 'available'}</small></span></button>`;
   const page = `<header class="top"><button class="icon-btn" type="button" data-back aria-label="Back">${svg('back')}</button><h1>Accounts</h1>${VIEW.items.length ? `<button class="icon-btn" type="button" data-act="sync" aria-label="Update from banks">${svg('sync')}</button>` : ''}</header>
   <section class="hero plain"><div class="htext"><p class="lbl">Net worth</p>${bigC(nw)}<p class="hline">${money(have, { round: true })} in your accounts, ${money(owe, { round: true })} owing.${newest ? ' Updated ' + ago(newest) + '.' : ''}</p></div></section>
   ${miss.length ? `<button class="needs" type="button" data-act="money" style="margin-top:12px"><span class="n" style="background:var(--bad);color:#fff">!</span><span><b>Add a rate for ${esc(miss.join(", "))}</b><small>Until then those accounts count 1 to 1 in your net worth.</small></span>${svg('back', 'ico chev')}</button>` : ''}
@@ -935,14 +1017,14 @@ function accounts() {
   ${Object.entries(groups).map(([g, as]) => sec(esc(g)) + `<div class="card">${as.map(row).join('')}</div>`).join('') || '<div style="margin-top:16px"></div>' + emptyCard('No accounts yet', 'Connect a bank to bring in balances and charges, or import a CSV.')}
   ${shared.length ? sec('Shared with you') + `<div class="card">${shared.map(row).join('')}</div>` : ''}
   <div class="btns">${CLOUD ? '' : '<button class="btn primary" type="button" data-act="plaid">Connect a bank</button>'}<button class="btn${CLOUD ? ' primary' : ''}" type="button" data-act="csv">Import a CSV</button><button class="btn" type="button" data-act="addacct">Add by hand</button></div>
-  ${VIEW.items.length ? sec('Banks') + `<div class="card">${VIEW.items.map(it => `<div class="row">${ticK('bank', it.error ? '--c7' : '--c3')}<span class="rt"><b>${esc(it.inst)}</b><small>${it.error ? (it.error === 'login' ? 'Needs you to sign in again' : esc(it.error)) : 'Updated ' + ago(it.syncedAt)}</small></span>${it.error ? `<button class="btn sm" type="button" data-fix="${esc(it.id)}">Reconnect</button>` : `<button class="btn sm" type="button" data-unlink="${esc(it.id)}">Disconnect</button>`}</div>`).join('')}</div>` : ''}
+  ${VIEW.items.length ? sec('Banks') + `<div class="card">${VIEW.items.map(it => `<div class="row">${ticK('bank', it.error ? '--c7' : '--c3')}<span class="rt"><b>${esc(it.inst)}</b><small${it.error ? ' style="white-space:normal"' : ''}>${it.error ? (it.error === 'login' ? 'Needs you to sign in again' : esc(it.error)) + ' · ' : ''}Last updated ${ago(it.syncedAt)}</small></span>${it.error ? `<button class="btn sm" type="button" data-fix="${esc(it.id)}">Reconnect</button>` : `<button class="btn sm" type="button" data-unlink="${esc(it.id)}">Disconnect</button>`}</div>`).join('')}</div>` : ''}
 `;
   const side = `${worthChart(nw)}
   ${sec('Your AI assistant')}
-  <div class="card"><div class="row" style="border:0">${ticK('bot', '--c6')}<span class="rt"><b>Ask Claude or Muse</b><small style="white-space:normal">"How much did I spend on dining this month?" Add Budget it as a connector with this address:</small></span><span></span></div>
+  <div class="card"><div class="row" style="border:0">${ticK('bot', '--c6')}<span class="rt"><b>Ask Claude, Muse or ChatGPT</b><small style="white-space:normal">“How much did I spend on dining this month?” Add Budget it as a connector with this address:</small></span>${LAPTOP ? '<button class="btn sm" type="button" data-act="assistants">Set up</button>' : '<span></span>'}</div>
   <div class="pad" style="padding-top:0"><code class="inp" style="display:block;font-family:var(--mono);font-size:.85rem;overflow-wrap:anywhere;box-shadow:none">${esc(LAPTOP ? location.origin + '/mcp' : 'https://your-laptop-address/mcp')}</code></div>
-  ${[['get_balances', 'Balances and net worth'], ['list_transactions', 'Find transactions'], ['spending_summary', 'Spending by category for any month'], ['budget_status', "What's left in each budget"], ['list_goals', 'Savings goals'], ['set_category', "Change a transaction's category"], ['add_cash_purchase', 'Add something paid in cash'], ['add_to_goal', 'Record savings toward a goal'], ['safe_to_spend', 'Safe to spend until payday'], ['list_bills', 'Bills and subscriptions'], ['month_report', 'How a month went'], ['year_review', 'Your year in review'], ['payoff_plan', 'How long a card or loan takes to pay off'], ['set_budget', 'Set a budget'], ['update_price', 'Update a holding’s price'], ['create_goal', 'Create a goal'], ['refresh_banks', 'Update from banks now'], ['undo_last_change', 'Undo the last change']].map(([c, d]) => `<div class="tool"><code>${c}</code><span>${d}</span></div>`).join('')}
-  <p class="pad small muted" style="margin:0">It acts as you, can’t move money and never sees bank passwords.</p></div>`;
+  ${[['get_balances', 'Balances and net worth'], ['list_transactions', 'Find transactions'], ['spending_summary', 'Spending by category for any month'], ['budget_status', "What’s left in each budget"], ['list_goals', 'Savings goals'], ['set_category', "Change a transaction’s category"], ['add_cash_purchase', 'Add something paid in cash'], ['add_to_goal', 'Record savings toward a goal'], ['safe_to_spend', 'Safe to spend until payday'], ['list_bills', 'Bills and subscriptions'], ['month_report', 'How a month went'], ['year_review', 'Your year in review'], ['payoff_plan', 'How long a card or loan takes to pay off'], ['set_budget', 'Set a budget'], ['update_price', 'Update a holding’s price'], ['create_goal', 'Create a goal'], ['refresh_banks', 'Update from banks now'], ['undo_last_change', 'Undo the last change']].map(([c, d]) => `<div class="tool"><code>${c}</code><span>${d}</span></div>`).join('')}
+  <p class="pad small muted" style="margin:0">It acts as you, can’t move money and never sees bank passwords.</p>${LAPTOP ? '<div class="pad" style="padding-top:8px"><button class="btn sm" type="button" data-act="assistants">Connect or manage assistants</button></div>' : ''}</div>`;
   if (WIDE()) return page.replace(/(<\/header>)/, '$1<div class="dash page"><div class="col-main">') + '</div><aside class="col-side">' + side + '</aside></div>';
   return page.replace('</section>', '</section>' + worthChart(nw)) + side.replace(worthChart(nw), '');
 }
@@ -997,6 +1079,11 @@ function pickable(root, attr) { let v = root.querySelector(`[data-${attr}][aria-
 const busy = (btn, on) => { if (btn) { btn.disabled = on; btn.style.opacity = on ? .6 : ''; } };
 const ordinal = d => d + ([, 'st', 'nd', 'rd'][d % 10 > 3 || ~~(d / 10) === 1 ? 0 : d % 10] || 'th');
 const ownAccts = () => S.accounts.filter(a => !a.other);
+// Who an account is shared with: a list of people now; an older budget said true for everyone here.
+const shareIds = a => Array.isArray(a.shared) ? a.shared : a.shared ? (VIEW.people || []).map(p => p.id) : [];
+const sharedLine = a => { const n = shareIds(a).map(id => (VIEW.people || []).find(p => p.id === id)).filter(Boolean).map(p => p.name);
+  return n.length ? 'Shared with ' + n.map(esc).join(', ') : a.shared === true ? 'Shared with household' : 'Only you'; };
+const changedAmt = (t, k) => t.changed.cur ? curMoney(t.changed[k], t.changed.cur, { abs: true }) : money(t.changed[k], { abs: true });
 async function getJ(url) {
   try { const r = await fetch(url, { credentials: 'same-origin' }); const j = await r.json().catch(() => ({})); if (!r.ok) { toast(j.error || 'That didn’t work. Try again.', false); return null; } return j; }
   catch { toast('Couldn’t reach the laptop. Check your connection.', false); return null; }
@@ -1016,7 +1103,7 @@ function addSheet(a = '', m = '', c = 'groceries') {
   <div class="amtin"><span>$</span><input id="ca" inputmode="decimal" placeholder="0.00" value="${esc(a)}" aria-label="Amount"></div>
   <label class="f">What was it?<input class="inp" id="cm" placeholder="Farmers market" value="${esc(m)}"></label>${catButtons(c, 'cat', ['income', 'transfer'])}
   <label class="f">When<input class="inp" id="cd" type="date" value="${TODAY}" max="${TODAY}"></label>
-  <p class="note">Card and bank charges come in from your bank by themselves. This is for cash, or anything your bank doesn't show.</p>
+  <p class="note">Card and bank charges come in from your bank by themselves. This is for cash, or anything your bank doesn’t show.</p>
   <div class="btns"><button class="btn primary" type="button" id="ok">Add it</button><button class="btn" type="button" data-close>Cancel</button></div>`, root => {
     const gc = pickable(root, 'cat'); if (a) root.querySelector('#ok').focus({ preventScroll: true });
     root.querySelector('#ok').onclick = async () => {
@@ -1030,7 +1117,7 @@ function editTxn(id) {
   const head = `<div class="rev-card"><small>${longDate(t.date)} · ${esc(acct(t.acct).name)}${t.pending ? ' · Pending' : ''}</small><div class="big num">${t.a > 0 ? '+' : ''}${money(t.a, { abs: t.a > 0 })}</div>${t.orig ? `<small>Was ${curMoney(t.orig.a, t.orig.cur, { abs: true })}</small>` : ''}<b>${esc(t.m)}</b></div>`;
   if (t.other) return sheet(head + `<p class="note">This is on ${esc(acct(t.acct).owner)}’s shared account, so only they can change it. It doesn’t count toward your budgets.</p><div class="btns"><button class="btn" type="button" data-close>Close</button></div>`);
   const pair = t.pair && S.txns.find(x => x.id === t.pair);
-  sheet(head + `${pair ? `<p class="note">Matched with ${money(pair.a, { abs: true })} ${pair.a > 0 ? 'arriving in' : 'leaving'} ${esc(acct(pair.acct).name)} on ${monName(B.ymOf(pair.date))} ${+pair.date.slice(8)}, so it's a transfer and doesn't count as spending. Pick another category if that's wrong.</p>` : ''}
+  sheet(head + `${t.changed ? `<p class="note"><b>${esc(t.m)} changed from ${changedAmt(t, 'was')} to ${changedAmt(t, 'now')} after you split it.</b> Your changes are kept${t.split ? ' and the first part took the difference' : ''}${t.sentTo ? `. Split it still has the old amount, so fix it there too if it’s wrong` : ''}. Save to mark it checked.</p>` : ''}${pair ? `<p class="note">Matched with ${money(pair.a, { abs: true })} ${pair.a > 0 ? 'arriving in' : 'leaving'} ${esc(acct(pair.acct).name)} on ${monName(B.ymOf(pair.date))} ${+pair.date.slice(8)}, so it’s a transfer and doesn’t count as spending. Pick another category if that’s wrong.</p>` : ''}
   ${catButtons(t.c)}
   <label class="chk"><input type="checkbox" id="rule"><span>Always put <b>${esc(B.ruleName(t.m))}</b> here, including past charges</span></label>
   <label class="f">Name<input class="inp" id="nm" value="${esc(t.m)}"></label>
@@ -1038,7 +1125,7 @@ function editTxn(id) {
   <label class="f">Tags<input class="inp" id="tg" value="${esc((t.tags || []).map(x => '#' + x).join(' '))}" placeholder="#japan-trip #wedding"></label>
   <label class="chk"><input type="checkbox" id="hd" ${t.hidden ? 'checked' : ''}><span><b>Don’t count this</b><br><span class="muted small">Leaves it out of budgets and totals. For a refunded purchase, a work expense you get back, or a one-off.</span></span></label>
   <div class="rcpt">${t.receipt ? `<a href="${esc(receiptSrc(t.receipt))}" target="_blank" rel="noopener"><img src="${esc(receiptSrc(t.receipt))}" alt="Receipt photo"></a>` : ''}
-    <label class="btn sm">${svg('cam', 'ico')} ${t.receipt ? 'Replace receipt' : 'Add a receipt photo'}<input type="file" id="rp" accept="image/*" capture="environment" hidden></label>
+    <button class="btn sm" type="button" id="rpBtn">${svg('cam', 'ico')} ${t.receipt ? 'Replace receipt' : 'Add a receipt photo'}</button><input type="file" id="rp" accept="image/*" capture="environment" hidden aria-label="Receipt photo">
     ${t.receipt ? '<button class="btn sm" type="button" id="rr">Remove</button>' : ''}</div>
   ${t.a < 0 ? `<button class="btn block" type="button" id="si">${t.sentTo ? 'Sent to Split it (' + esc(t.sentTo) + '). Send again' : 'Split it with someone'}</button>` : ''}
   ${t.a < 0 && !t.split ? `<details><summary style="font-weight:800;cursor:pointer">Split into two categories</summary><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px"><label class="f">Amount to move<input class="inp" id="sa" inputmode="decimal" placeholder="20.00"></label>${catButtons('', 'scat', ['income', 'transfer'])}</div></details>` : ''}
@@ -1047,7 +1134,9 @@ function editTxn(id) {
     const del = root.querySelector('#del'); if (del) del.onclick = () => { close(); api('txn.delete', { id }); };
     const si = root.querySelector('#si'); if (si) si.onclick = () => splitSheet(t);
     if (CLOUD && t.receipt === 'rc') CCOL.doc('rc-' + t.id).get().then(d => { const x = d.exists && d.data().data; if (!x) return; root.querySelectorAll('.rcpt img').forEach(i => { i.src = x; }); const l = root.querySelector('.rcpt a'); if (l) l.href = x; }).catch(() => {});
-    const rr = root.querySelector('#rr'); if (rr) rr.onclick = () => { close(); LAPTOP ? post('/api/receipt', { id, data: '' }) : api('txn.receipt', { id, receipt: '' }); };
+    root.querySelector('#rpBtn').onclick = () => root.querySelector('#rp').click();
+    // removing a photo takes a second tap, so it isn't removed by accident
+    const rr = root.querySelector('#rr'); if (rr) rr.onclick = () => { if (!confirmTap(rr, 'Tap again to remove it')) return; close(); LAPTOP ? post('/api/receipt', { id, data: '' }) : api('txn.receipt', { id, receipt: '' }); };
     root.querySelector('#rp').onchange = async e => {
       const f = e.target.files[0]; if (!f) return;
       try { const data = await shrinkPhoto(f); close(); if (LAPTOP) post('/api/receipt', { id, data }); else api('txn.receipt', { id, receipt: data }); }
@@ -1061,16 +1150,18 @@ function editTxn(id) {
     };
   });
 }
+// What a charge sent to Split it was for in full: my part plus what housemates owe back ("count only my share")
+const sentWhole = t => -(t.a + ((S.txns || []).find(x => x.splitOf === t.id && x.owed)?.a || 0));
 // Send a charge to Split it as a shared expense (through Split it's assistant connection).
 async function splitSheet(t) {
   if (CLOUD) return sheet(`<h3>Send to Split it</h3><p class="note">Sending charges to Split it works in the laptop app, where Budget it and Split it run side by side. Here, add a tag like #house so you can find shared charges later.</p><div class="btns"><button class="btn" type="button" data-close>OK</button></div>`);
   if (LAPTOP && !VIEW.splitit) return splitConnect(() => splitSheet(t));
   let groups = ['House', 'Japan trip'];
   if (LAPTOP) { const j = await getJ('/api/splitit/groups'); if (!j) return; groups = j.groups; }
-  if (!groups.length) return sheet(`<h3>No groups in Split it yet</h3><p>Make a group in Split it first, like "House", then come back.</p><div class="btns"><button class="btn" type="button" data-close>OK</button></div>`);
+  if (!groups.length) return sheet(`<h3>No groups in Split it yet</h3><p>Make a group in Split it first, like “House”, then come back.</p><div class="btns"><button class="btn" type="button" data-close>OK</button></div>`);
   sheet(`<h3>Split it with someone</h3><p style="margin:-6px 0 0">Adds this to Split it as a shared expense you paid, split equally with everyone in the group.</p>
   <label class="f">What for<input class="inp" id="st" value="${esc(B.baseName(t.m))}"></label>
-  <div class="amtin"><span>$</span><input id="sm" inputmode="decimal" value="${(-t.a).toFixed(2)}" aria-label="Amount to split"></div>
+  <div class="amtin"><span>$</span><input id="sm" inputmode="decimal" value="${sentWhole(t).toFixed(2)}" aria-label="Amount to split"></div>
   <b>Group</b><div class="catgrid" role="group" aria-label="Group">${groups.map((g, k) => `<button type="button" data-grp="${esc(g)}" aria-pressed="${k === 0}"><span>${esc(g)}</span></button>`).join('')}</div>
   ${LAPTOP && !t.split ? `<label class="chk"><input type="checkbox" id="mine" ${store.get('bi-mine') === false ? '' : 'checked'}><span><b>Count only my share in my budget</b><br><span class="muted small">The part your housemates owe you back stops counting as your spending. It shows as its own line, “Owed back by housemates”.</span></span></label>` : ''}
   ${!LAPTOP ? '<p class="note">In this preview nothing is sent. On the laptop it goes straight into Split it.</p>' : ''}
@@ -1087,7 +1178,7 @@ async function splitSheet(t) {
 }
 function splitConnect(then) {
   sheet(`<h3>Connect Split it</h3><p style="margin:-6px 0 0">Send charges to <b>Split it</b>, the bill splitter from Budget it, without typing them again.</p>
-  <ol class="small" style="margin:0;padding-left:20px;line-height:1.5"><li>On the laptop, in Split it's folder, run <code>node server.js mcp-key ${esc(VIEW.me.name.split(' ')[0])}</code></li><li>Paste the key it prints below. It acts as you in Split it.</li></ol>
+  <ol class="small" style="margin:0;padding-left:20px;line-height:1.5"><li>On the laptop, in Split it’s folder, run <code>node server.js mcp-key ${esc(VIEW.me.name.split(' ')[0])}</code></li><li>Paste the key it prints below. It acts as you in Split it.</li></ol>
   <label class="f">Split it address<input class="inp" id="su" value="${esc(VIEW.splititUrl || 'http://localhost:8080')}"></label>
   <label class="f">Key<input class="inp" id="sk" autocomplete="off" spellcheck="false" placeholder="hsk_..."></label>
   <div class="btns"><button class="btn primary" type="button" id="ok">Connect</button>${VIEW.splitit ? '<button class="btn" type="button" id="off">Disconnect</button>' : '<button class="btn" type="button" data-close>Cancel</button>'}</div>`, root => {
@@ -1136,8 +1227,8 @@ const acctOptions = sel => ownAccts().filter(a => a.type !== 'Credit card' && a.
 function addGoal(id) {
   const g = S.goals.find(x => x.id === id); if (!g) return;
   const saved = B.goalSaved(S, g);
-  if (g.acct) return sheet(`<h3>${esc(g.n)}</h3><p style="margin:-6px 0 0">This goal follows <b>${esc(acct(g.acct).name)}</b>. What's saved is that account's balance, ${money(saved)}, so it updates by itself.</p>
-    <label class="f">Follow<select class="inp" id="ga"><option value="">Nothing, I'll add savings myself</option>${acctOptions(g.acct)}</select></label>
+  if (g.acct) return sheet(`<h3>${esc(g.n)}</h3><p style="margin:-6px 0 0">This goal follows <b>${esc(acct(g.acct).name)}</b>. What’s saved is that account’s balance, ${money(saved)}, so it updates by itself.</p>
+    <label class="f">Follow<select class="inp" id="ga"><option value="">Nothing, I’ll add savings myself</option>${acctOptions(g.acct)}</select></label>
     <div class="btns"><button class="btn primary" type="button" id="ok">Save</button><button class="btn" type="button" id="rm">Delete goal</button></div>`, root => {
       root.querySelector('#rm').onclick = () => { close(); api('goal.delete', { id }); };
       root.querySelector('#ok').onclick = () => { close(); api('goal.link', { id, acct: root.querySelector('#ga').value }); };
@@ -1146,7 +1237,7 @@ function addGoal(id) {
   <div class="amtin"><span>$</span><input id="ga" inputmode="decimal" value="${Math.max(0, Math.min(100, g.target - saved)).toFixed(2)}" aria-label="Amount"></div>
   <p class="small muted" style="margin:-6px 0 0">${money(Math.max(0, g.target - saved))} to go.</p>
   <p class="note">This updates Budget it only. Move the real money in your bank app. Saving in its own account? Let the goal follow that account instead.</p>
-  ${acctOptions() ? `<label class="f">Or follow an account<select class="inp" id="gl"><option value="">No, I'll add savings myself</option>${acctOptions()}</select></label>` : ''}
+  ${acctOptions() ? `<label class="f">Or follow an account<select class="inp" id="gl"><option value="">No, I’ll add savings myself</option>${acctOptions()}</select></label>` : ''}
   <div class="btns"><button class="btn primary" type="button" id="ok">Save</button><button class="btn" type="button" id="rm">Delete goal</button></div>`, root => {
     root.querySelector('#rm').onclick = () => { close(); api('goal.delete', { id }); };
     root.querySelector('#ok').onclick = () => { const link = root.querySelector('#gl')?.value; close(); if (link) return api('goal.link', { id, acct: link });
@@ -1158,7 +1249,7 @@ function newGoal() {
   sheet(`<h3>New savings goal</h3><label class="f">Name<input class="inp" id="gn" placeholder="Winter tires"></label>
   <div class="amtin"><span>$</span><input id="gt" inputmode="decimal" placeholder="900" aria-label="Goal amount"></div>
   <label class="f">Finish by<select class="inp" id="gb">${opts.map((v, i) => `<option value="${v}" ${i === 5 ? 'selected' : ''}>${monName(v, 1)} ${v.slice(0, 4)}</option>`).join('')}</select></label>
-  ${acctOptions() ? `<label class="f">Follow an account (optional)<select class="inp" id="gl"><option value="">No, I'll add savings myself</option>${acctOptions()}</select></label>` : ''}
+  ${acctOptions() ? `<label class="f">Follow an account (optional)<select class="inp" id="gl"><option value="">No, I’ll add savings myself</option>${acctOptions()}</select></label>` : ''}
   <div class="btns"><button class="btn primary" type="button" id="ok">Create</button><button class="btn" type="button" data-close>Cancel</button></div>`, root => {
     root.querySelector('#ok').onclick = () => { const n = root.querySelector('#gn').value.trim(), t = num(root.querySelector('#gt').value); if (!n || !(t > 0)) return toast('Add a name and an amount', false); close(); api('goal.add', { n, target: t, by: root.querySelector('#gb').value, acct: root.querySelector('#gl')?.value || '' }); };
   });
@@ -1178,14 +1269,14 @@ function billSheet(key) {
 }
 function billForm(b) {
   b = b || { n: '', a: '', d: B.dayOf(TODAY), every: 'month', month: +CUR.slice(5), c: 'home', sub: false };
-  sheet(`<h3>${b.id ? esc(b.n) : 'Add a bill'}</h3><p class="muted" style="margin:-8px 0 0">For bills Budget it can't spot by itself, like yearly insurance or a bill paid in cash.</p>
+  sheet(`<h3>${b.id ? esc(b.n) : 'Add a bill'}</h3><p class="muted" style="margin:-8px 0 0">For bills Budget it can’t spot by itself, like yearly insurance or a bill paid in cash.</p>
   <label class="f">Name<input class="inp" id="bn" value="${esc(b.n)}" placeholder="Car insurance"></label>
   <div class="amtin"><span>$</span><input id="ba" inputmode="decimal" value="${b.a}" placeholder="0.00" aria-label="Amount"></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="f">How often<select class="inp" id="be"><option value="month" ${b.every !== 'year' ? 'selected' : ''}>Every month</option><option value="year" ${b.every === 'year' ? 'selected' : ''}>Every year</option></select></label>
   <label class="f">Day<input class="inp" id="bd" inputmode="numeric" value="${b.d}"></label></div>
   <label class="f" id="bmw" ${b.every === 'year' ? '' : 'hidden'}>Month<select class="inp" id="bm">${MONL.map((m, i) => `<option value="${i + 1}" ${+b.month === i + 1 ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
   ${catButtons(b.c, 'cat', ['income', 'transfer'])}
-  <label class="chk"><input type="checkbox" id="bs" ${b.sub ? 'checked' : ''}><span>It's a subscription</span></label>
+  <label class="chk"><input type="checkbox" id="bs" ${b.sub ? 'checked' : ''}><span>It’s a subscription</span></label>
   <div class="btns"><button class="btn primary" type="button" id="ok">Save</button>${b.id ? '<button class="btn" type="button" id="rm">Remove</button>' : '<button class="btn" type="button" data-close>Cancel</button>'}</div>`, root => {
     const gc = pickable(root, 'cat');
     root.querySelector('#be').onchange = e => root.querySelector('#bmw').hidden = e.target.value !== 'year';
@@ -1201,7 +1292,7 @@ function safeSheet() {
   <div class="card"><div class="row" style="border:0">${ticK('bank', '--c1')}<span class="rt"><b>In chequing</b></span><span class="amt">${money(x.cash)}</span></div>
   <div class="row">${ticK('lock', '--c7')}<span class="rt"><b>Owing on cards</b><small>Already spent</small></span><span class="amt">${money(x.cards)}</span></div>
   <div class="row">${ticK('cal', '--c6')}<span class="rt"><b>Bills before payday</b><small>${x.bills.map(b => esc(b.n)).join(', ') || 'None'}</small></span><span class="amt">−${money(x.billsTotal)}</span></div></div>
-  <p class="note">Your pay looks like ${esc(x.payday.name)}, about ${money(x.payday.amount, { round: true })} ${esc(x.payday.every)}. Savings accounts aren't counted.</p>
+  <p class="note">Your pay looks like ${esc(x.payday.name)}, about ${money(x.payday.amount, { round: true })} ${esc(x.payday.every)}. Savings accounts aren’t counted.</p>
   <div class="btns"><button class="btn primary" type="button" data-close>Got it</button></div>`);
 }
 function alertSheet(key) {
@@ -1215,7 +1306,7 @@ function alertSheet(key) {
 }
 function csv() {
   const imported = S.accounts.filter(a => a.csv && !a.other);
-  sheet(`<h3>Import a CSV</h3><p style="margin:-6px 0 0">For banks Plaid can't reach. Download a CSV of transactions from your bank's website and pick it here. Budget it understands most bank exports, and skips rows it already has.</p>
+  sheet(`<h3>Import a CSV</h3><p style="margin:-6px 0 0">For banks Plaid can’t reach. Download a CSV of transactions from your bank’s website and pick it here. Budget it understands most bank exports, and skips rows it already has.</p>
   ${imported.length ? `<label class="f">Add to<select class="inp" id="ca"><option value="">A new account</option>${imported.map(a => `<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('')}</select></label>` : ''}
   <label class="f">Account name<input class="inp" id="cn" placeholder="Credit union chequing"></label>
   <label class="f">CSV file<input class="inp" type="file" id="cf" accept=".csv,text/csv"></label>
@@ -1304,26 +1395,33 @@ async function openLink(item, back) {
       store.set('bi-link', null);
       if (item) { const x = await post('/api/plaid/fixed', { item }); return x; }
       toast('Bringing in your accounts…', false);
-      await post('/api/plaid/exchange', { public_token: publicToken, institution: meta?.institution?.name });
+      await post('/api/plaid/exchange', { public_token: publicToken, institution: meta?.institution?.name, institution_id: meta?.institution?.institution_id });
     },
     onExit: err => { if (err && err.display_message) toast(err.display_message, false); } });
   h.open();
 }
 function plaid() {
-  if (CLOUD) return sheet(`<h3>Add your accounts</h3><p style="margin:-6px 0 0">Here you can import transactions from your bank's website as a CSV, or add an account by hand and keep its balance up to date.</p>
+  if (CLOUD) return sheet(`<h3>Add your accounts</h3><p style="margin:-6px 0 0">Here you can import transactions from your bank’s website as a CSV, or add an account by hand and keep its balance up to date.</p>
   <p class="note">Bank connections through Plaid work in the laptop app, because the Plaid keys have to stay on your own computer.</p>
   <div class="btns"><button class="btn primary" type="button" data-act="csv">Import a CSV</button><button class="btn" type="button" data-act="addacct">Add by hand</button><button class="btn" type="button" data-close>Cancel</button></div>`);
   const ready = LAPTOP && VIEW.plaid.configured;
-  sheet(`<h3>Connect a bank</h3><p style="margin:-6px 0 0">Budget it uses <b>Plaid</b> to bring in balances and transactions. You sign in to your bank in Plaid's own window, so Budget it never sees your bank password.</p>
-  <div class="facts"><div>${svg('eye', '')}<span><b>Read only</b>Budget it can see balances and transactions. It can't move money.</span></div><div>${svg('laptop', '')}<span><b>Stays on your laptop</b>The bank connection is saved encrypted on your own computer.</span></div><div>${svg('x', '')}<span><b>Disconnect any time</b>Remove a bank here and its connection is deleted at Plaid too.</span></div></div>
-  ${!LAPTOP ? `<p class="note">This preview can't reach Plaid. The button adds a test bank with a few sample charges, like the laptop app does in Plaid's test mode.</p>`
+  sheet(`<h3>Connect a bank</h3><p style="margin:-6px 0 0">Budget it uses <b>Plaid</b> to bring in balances and transactions. You sign in to your bank in Plaid’s own window, so Budget it never sees your bank password.</p>
+  <div class="facts"><div>${svg('eye', '')}<span><b>Read only</b>Budget it can see balances and transactions. It can’t move money.</span></div><div>${svg('laptop', '')}<span><b>Stays on your laptop</b>The bank connection is saved encrypted on your own computer.</span></div><div>${svg('x', '')}<span><b>Disconnect any time</b>Remove a bank here and its connection is deleted at Plaid too.</span></div></div>
+  ${!LAPTOP ? `<p class="note">This preview can’t reach Plaid. The button adds a test bank with a few sample charges, like the laptop app does in Plaid’s test mode.</p>`
     : !ready ? `<p class="note">Plaid isn’t set up on this laptop yet. Whoever runs Budget it adds PLAID_CLIENT_ID and PLAID_SECRET to budget-it.env (see the README), then restarts it. CSV import works in the meantime.</p>`
     : VIEW.plaid.env !== 'production' ? `<p class="note">Plaid test mode: pick any bank and sign in with <b>user_good</b> / <b>pass_good</b>. Real banks work once Plaid approves production.</p>`
     : VIEW.plaid.limit ? `<p class="note"><b>${VIEW.plaid.used} of ${VIEW.plaid.limit} bank connections used</b> on this laptop. Plaid’s free plan counts every bank you connect, and disconnecting one doesn’t give it back. ${VIEW.plaid.used >= VIEW.plaid.limit ? 'Plaid will probably refuse another one. CSV import and accounts you keep by hand still work.' : 'If a bank stops updating, use Reconnect on it instead of removing it and adding it again.'}</p>` : ''}
   <div class="btns">${!LAPTOP || ready ? `<button class="btn primary" type="button" id="ok">${LAPTOP ? 'Continue' : 'Connect test bank'}</button>` : '<button class="btn primary" type="button" data-act="csv">Import a CSV</button>'}<button class="btn" type="button" data-close>Cancel</button></div>`, root => {
     const ok = root.querySelector('#ok'); if (!ok) return;
-    ok.onclick = () => { close(); if (LAPTOP) return openLink(); demoBank(); };
+    ok.onclick = () => { close(); if (!LAPTOP) return demoBank(); if (VIEW.plaid.env === 'production' && VIEW.plaid.limit) return useOne(); openLink(); };
   });
+}
+// Plaid's free plan: 10 bank connections for good, and a removed one still counts. Asked before every new one.
+function useOne() {
+  const left = Math.max(0, VIEW.plaid.limit - VIEW.plaid.used);
+  sheet(`<h3>Use a bank connection?</h3><p class="note"><b>This uses 1 of your ${VIEW.plaid.limit} free bank connections; ${left} left.</b> Removing a bank later doesn’t give it back.</p>
+  <p class="small muted" style="margin:0">If a bank you already connected stopped updating, cancel and use Reconnect on it instead. That doesn’t use one.</p>
+  <div class="btns"><button class="btn primary" type="button" id="ok">Use one and continue</button><button class="btn" type="button" data-close>Cancel</button></div>`, root => root.querySelector('#ok').onclick = () => { close(); openLink(); });
 }
 function demoBank() {
   if (S.accounts.some(a => a.id === 'plat')) return toast('The test bank is already connected', false);
@@ -1347,17 +1445,19 @@ function addAcct() {
 }
 function editAcct(id) {
   const a = acct(id), cm = v => curMoney(v, a.cur);
-  if (a.other) return sheet(`<h3>${esc(a.name)}</h3><p class="note">${esc(a.owner)} shares this account with the household. You can see its balance and charges. It doesn’t count toward your budgets.</p><div class="btns"><button class="btn" type="button" data-close>Close</button></div>`);
+  if (a.other) return sheet(`<h3>${esc(a.name)}</h3><p class="note">${esc(a.owner)} shares this account with you. You can see its balance and charges. It doesn’t count toward your budgets.</p><div class="btns"><button class="btn" type="button" data-close>Close</button></div>`);
   sheet(`<h3>${esc(a.name)}</h3><p class="muted" style="margin:-8px 0 0">${esc(a.inst)} ${esc(a.type)}${a.mask ? ' ···' + esc(a.mask) : ''}${a.synced ? ' · updated ' + ago(a.synced) : ''}</p>
   <label class="f">Name<input class="inp" id="an" value="${esc(a.name)}"></label>
   ${(a.manual || a.csv) && !(a.holdings && a.holdings.length) ? `<label class="f">${a.type === 'Credit card' || a.type === 'Loan' ? 'You owe' : 'Balance'}<input class="inp" id="ab" inputmode="decimal" value="${Math.abs(a.bal || 0).toFixed(2)}"></label>` : ''}
-  ${CLOUD ? '' : `<label class="chk"><input type="checkbox" id="sh" ${a.shared ? 'checked' : ''}><span><b>Share with the household</b><br><span class="muted small">Everyone signed in to this Budget it sees this account's balance and charges. Your other accounts stay private.</span></span></label>`}
+  ${a.disconnected ? `<p class="note">Disconnected from ${esc(a.inst)}${a.disconnectedOn ? ' on ' + longDate(a.disconnectedOn) : ''}. Its history is kept. Connect the bank again and it carries on from here.</p>` : ''}
+  ${CLOUD ? '' : (VIEW.people || []).length ? `<b>Who else can see it</b>${VIEW.people.map(p => `<label class="chk"><input type="checkbox" data-share="${esc(p.id)}" ${shareIds(a).includes(p.id) ? 'checked' : ''}><span>${esc(p.name)}${p.friend ? ' <small class="muted">· friend</small>' : ''}</span></label>`).join('')}<p class="small muted" style="margin:0">They see this account’s balance and charges, read only. Your other accounts stay private.</p>`
+    : LAPTOP ? '<p class="small muted" style="margin:0">To share this account with someone, invite them first from Settings.</p>' : ''}
   ${a.manual || a.csv ? `<label class="f">Currency<select class="inp" id="acur">${B.CURRENCIES.map(c => `<option ${(a.cur || B.homeCur(S)) === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>` : a.cur ? `<p class="note">This account is in ${esc(a.cur)}. ${B.rate(S, a.cur) ? `It counts as about ${money(B.inHome(S, a), { abs: true })} in your totals.` : `Add a rate in Settings, Currencies, so it counts right in your totals.`}</p>` : ''}
   ${a.limit ? `<p class="note">${curMoney(-a.bal, a.cur)} owing of a ${curMoney(a.limit, a.cur, { round: true })} limit.</p>` : ''}
   ${holdingsCard(a)}
   ${a.bal < 0 ? `<div class="card pad payoff"><b>Pay it off</b><div class="two"><label class="f">Interest rate (APR %)<input class="inp" id="apr" inputmode="decimal" placeholder="20.99" value="${a.apr ?? ''}"></label>
     <label class="f">You pay each month<input class="inp" id="pay" inputmode="decimal" placeholder="${B.payFor(-a.bal, a.apr || 20, 12).toFixed(2)}" value="${a.pay ? a.pay.toFixed(2) : ''}"></label></div><p class="small" id="po" aria-live="polite" style="margin:10px 0 0"></p></div>` : ''}
-  <div class="btns"><button class="btn primary" type="button" id="ok">Save</button>${a.manual || a.csv ? '<button class="btn" type="button" id="del">Remove</button>' : ''}<button class="btn" type="button" data-close>Cancel</button></div>`, root => {
+  <div class="btns"><button class="btn primary" type="button" id="ok">Save</button>${a.manual || a.csv ? '<button class="btn" type="button" id="del">Remove</button>' : a.disconnected ? '<button class="btn" type="button" id="del">Delete this history</button>' : ''}<button class="btn" type="button" data-close>Cancel</button></div>`, root => {
     const ah = root.querySelector('#addhold'); if (ah) ah.onclick = () => holdingForm(id, null);
     const pr = root.querySelector('#prices'); if (pr) pr.onclick = () => pricesSheet(id);
     root.querySelectorAll('button[data-hold]').forEach(b => b.onclick = () => holdingForm(id, b.dataset.hold));
@@ -1373,12 +1473,12 @@ function editAcct(id) {
     };
     if (po) { root.querySelector('#apr').oninput = plan; root.querySelector('#pay').oninput = plan; plan(); }
     const del = root.querySelector('#del');
-    if (del) del.onclick = () => { if (del.dataset.sure) { close(); return api('account.delete', { id }); } del.dataset.sure = '1'; del.textContent = 'Tap again to remove it and its transactions'; };
+    if (del) del.onclick = () => { if (del.dataset.sure) { close(); return api('account.delete', { id }); } del.dataset.sure = '1'; del.textContent = a.disconnected ? 'Tap again to delete it and its transactions for good' : 'Tap again to remove it and its transactions'; };
     root.querySelector('#ok').onclick = async () => {
-      const shb = root.querySelector('#sh'), sh = shb ? shb.checked : !!a.shared, nm = root.querySelector('#an').value.trim(), abx = root.querySelector('#ab'); close();
+      const boxes = [...root.querySelectorAll('[data-share]')], sh = boxes.filter(b => b.checked).map(b => b.dataset.share), nm = root.querySelector('#an').value.trim(), abx = root.querySelector('#ab'); close();
       if (nm && nm !== a.name) await api('account.rename', { id, name: nm }, true);
       if (abx && num(abx.value) !== Math.abs(a.bal || 0)) await api('account.balance', { id, bal: num(abx.value) }, true);
-      if (sh !== !!a.shared) await api('account.share', { id, shared: sh }, true);
+      if (boxes.length && [...sh].sort().join() !== shareIds(a).filter(x => boxes.some(b => b.dataset.share === x)).sort().join()) await api('account.share', { id, with: sh });
       const acur = root.querySelector('#acur'); if (acur && acur.value !== (a.cur || B.homeCur(S))) await api('account.currency', { id, cur: acur.value }, true);
       if (po) { const apr = root.querySelector('#apr').value.trim(), pay = root.querySelector('#pay').value.trim();
         const nApr = apr === '' ? undefined : num(apr), nPay = pay === '' ? 0 : num(pay);
@@ -1420,18 +1520,18 @@ function settings() {
   const row = (act, k, color, title, small) => `<button class="row" type="button" data-act="${act}">${ticK(k, color)}<span class="rt"><b>${title}</b><small>${small}</small></span><span></span></button>`;
   sheet(`<h3>Settings</h3><b>Your guide</b>
   <div class="catgrid">${['luffy', 'hancock'].map(x => `<button type="button" data-guide="${x}" aria-pressed="${g === x}" style="flex-direction:column;align-items:center"><img src="${ART[x].happy}" alt="" style="width:72px;height:84px;object-fit:contain;background:var(--hero);border-radius:10px;border:2px solid var(--edge)"><span>${GNAME[x]}</span></button>`).join('')}<button type="button" data-guide="none" aria-pressed="${g === 'none'}" style="justify-content:center">No guide</button></div>
-  <div class="card setlist"><button class="row" type="button" data-sub="accounts">${ticK('bank', '--c1')}<span class="rt"><b>Accounts and banks</b><small>${ownAccts().length} account${ownAccts().length === 1 ? '' : 's'}</small></span><span></span></button>
+  <div class="card setlist"><button class="row" type="button" data-sub="accounts">${ticK('bank', '--c1')}<span class="rt"><b>Accounts and banks</b><small>${ownAccts().length} account${ownAccts().length === 1 ? '' : 's'}${VIEW.items.some(i => i.error) ? ' · a bank needs you' : VIEW.items.length ? ' · last updated ' + ago(Math.min(...VIEW.items.map(i => i.syncedAt || 0))) : ''}</small></span><span></span></button>
   ${row('cats', 'pie', '--c2', 'Categories', `${B.CATS.filter(c => c.custom).length ? B.CATS.filter(c => c.custom).length + ' of your own' : 'Rename them or add your own'}`)}
   ${row('rules', 'rule', '--c6', 'Rules', `${S.rules.length} rule${S.rules.length === 1 ? '' : 's'}`)}
   ${row('money', 'bank', '--c5', 'Currencies', `Totals in ${B.homeCur(S)}${Object.keys(S.rates || {}).length ? ' · ' + Object.entries(S.rates).map(([c, r]) => `1 ${esc(c)} = ${r}`).join(', ') : ''}`)}
   ${row('private', 'eye', '--c8', PRIVATE ? 'Show amounts' : 'Hide amounts', PRIVATE ? 'Amounts are blurred on this phone' : 'Blur every number, for checking in public')}
   ${row('splitit', 'people', '--c3', 'Split it', LAPTOP ? (VIEW.splitit ? 'Connected. Send charges to split' : 'Connect to send charges to split') : CLOUD ? 'Works in the laptop app' : 'Send charges to split with your household')}
-  ${LAPTOP ? row('push', 'bell', '--c4', 'Phone notifications', 'Budgets, bills, a weekly check-in and alerts') + row('invite', 'people', '--c3', 'Invite someone', 'They get their own private budget')
-    + row('signin', 'lock', '--c6', 'Your sign-in', 'Password, email and a sign-in code') + (VIEW.me.owner ? row('owner', 'gear', '--c1', 'People, backups and health', 'For whoever runs this Budget it') : '') : ''}
+  ${LAPTOP ? row('push', 'bell', '--c4', 'Phone notifications', 'Budgets, bills, a weekly check-in and alerts') + row('friends', 'people', '--c3', 'People and friends', FREQS ? `${FREQS} friend request${FREQS === 1 ? '' : 's'} waiting` : 'Your @tag, find people, invite someone')
+    + row('signin', 'lock', '--c6', 'Your sign-in', 'Password, email and a sign-in code') + row('assistants', 'bot', '--c6', 'AI assistants', 'Connect Claude, Muse or ChatGPT to your budget') + row('mydata', 'file', '--c7', 'Your data', 'Download a copy of it, or delete it and your account') + (VIEW.me.owner ? row('owner', 'gear', '--c1', 'People, backups and health', 'For whoever runs this Budget it') : '') : ''}
   ${row('export', 'file', '--c5', 'Export transactions', 'Everything as a CSV, for taxes or a spreadsheet')}
-  ${row('whatsnew', 'star', '--c4', "What's new", 'v' + esc(VIEW.version))}
+  ${row('whatsnew', 'star', '--c4', "What’s new", 'v' + esc(VIEW.version))}
   ${S.sample ? row('unsample', 'x', '--c7', 'Remove sample data', 'Keeps your own accounts and anything you added') : ''}
-  ${CLOUD ? row('wipe', 'x', '--c8', 'Start over', 'Delete everything in this budget') : !LAPTOP ? row('reset', 'sync', '--c8', 'Reset the preview', 'Start over with fresh sample data') : `<a class="row" href="/api/logout" style="text-decoration:none">${ticK('out', '--c8')}<span class="rt"><b>Sign out</b><small>${esc(VIEW.me.name)}</small></span><span></span></a>`}</div>
+  ${CLOUD ? row('wipe', 'x', '--c8', 'Start over', 'Delete everything in this budget') : !LAPTOP ? row('reset', 'sync', '--c8', 'Reset the preview', 'Start over with fresh sample data') : `<a class="row" href="/api/logout" data-signout style="text-decoration:none">${ticK('out', '--c8')}<span class="rt"><b>Sign out</b><small>${esc(VIEW.me.name)}</small></span><span></span></a>`}</div>
   <div class="btns"><button class="btn" type="button" data-close>Done</button></div>`, root => root.querySelectorAll('[data-guide]').forEach(b => b.onclick = () => { close(); api('guide.set', { guide: b.dataset.guide }, true); }));
 }
 // Home currency and the rate for each other currency your accounts use
@@ -1454,7 +1554,8 @@ function moneySheet() {
 }
 // ---------- your sign-in, and the page for whoever runs this Budget it (laptop app) ----------
 async function call(url, body, method) {
-  const r = await fetch(url, { method: method || (body ? 'POST' : 'GET'), credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  const r = await fetch(url, { method: method || (body ? 'POST' : 'GET'), credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+    .catch(() => { throw new Error('Couldn’t reach the laptop. Check your connection and try again.'); });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.error === 'signed out' ? 'You’re signed out. Sign in again.' : d.error || 'That didn’t work. Try again.');
   return d;
@@ -1477,6 +1578,70 @@ function miniForm(box, html, label, go) {
     try { await go(); } catch (x) { err.textContent = x.message; err.hidden = false; busy(b, false); } };
   box.querySelectorAll('input').forEach(i => i.onkeydown = e => { if (e.key === 'Enter') box.querySelector('#mfGo').click(); });
 }
+// Your own data: a copy to keep, or delete it all (budget, banks, receipts and the account). Only ever your own.
+function myDataSheet() {
+  const banks = VIEW.items.length;
+  sheet(`<h3>Your data</h3><p style="margin:-6px 0 0">A file with your budget: accounts, transactions, budgets, goals, rules and the list of your receipt photos. Accounts other people share with you are theirs, so they aren’t in it.</p>
+  <div class="btns"><a class="btn primary" href="/api/me/export" download>Download my data</a></div>
+  <b>Delete my data</b>
+  <p class="small muted" style="margin:-8px 0 0">Deletes your budget, receipt photos and account here${banks ? `, and disconnects your ${banks} bank${banks === 1 ? '' : 's'} at Plaid` : ''}. You’re signed out everywhere. It can’t be undone. The laptop’s own backups keep a copy until they’re replaced, up to a year for the weekly ones.</p>
+  <div id="mdForm" style="display:contents"></div>
+  <div class="btns"><button class="btn danger" type="button" id="mdDel">Delete my data…</button><button class="btn" type="button" data-close>Done</button></div>`, root => {
+    const form = root.querySelector('#mdForm');
+    root.querySelector('#mdDel').onclick = () => miniForm(form, `<label class="f">Type your name, ${esc(VIEW.me.name)}, to confirm<input class="inp" id="mdName" autocomplete="off" autocapitalize="off"></label>`, 'Delete everything of mine', async () => {
+      const name = form.querySelector('#mdName').value.trim();
+      if (name.toLowerCase() !== VIEW.me.name.toLowerCase()) throw new Error('Type ' + VIEW.me.name + ' to confirm.');
+      await call('/api/me/delete', { name });
+      signOut('/login', true);
+    });
+  });
+}
+// For whoever runs it: the budgets were put back from a safety copy, or the disk is (nearly) full.
+function ownerNoteSheet() {
+  const n = VIEW.ownerNotes || {}, r = n.recovered;
+  sheet(`<h3>${r ? 'Budgets were put back from a copy' : 'The laptop’s disk'}</h3>
+  ${n.disk ? `<p class="warnbox">${esc(n.disk)}</p>` : ''}
+  ${r ? `<p>When Budget it started ${ago(r.at)}, its budgets file (db.json) was damaged, so it used the newest good copy: <b>${esc(r.from)}</b>, from ${esc(new Date(r.copyAt).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' }))}. Changes made after that copy are missing.</p>
+  <p class="small muted" style="margin:0">The damaged file is kept on the laptop as data/${esc(r.damaged || 'db.json.damaged-...')}.</p>` : ''}
+  <div class="btns">${r ? '<button class="btn primary" type="button" id="onSeen">Got it</button>' : ''}<button class="btn" type="button" data-close>Close</button></div>`, root => {
+    const seen = root.querySelector('#onSeen');
+    if (seen) seen.onclick = async () => { try { await call('/api/admin/recovery-seen', {}); VIEW.ownerNotes.recovered = null; close(); render(); } catch (e) { toast(e.message, false); } };
+  });
+}
+// Your AI assistants: the connector link, keys you make yourself, and disconnecting them.
+async function assistantsSheet() {
+  let a; try { a = await call('/api/assistants'); } catch (e) { return toast(e.message, false); }
+  const item = x => line(x.kind === 'key' ? 'lock' : 'bot', '--c6', esc(x.name), `${x.kind === 'key' ? 'Key made' : 'Connected'} ${ago(x.since)} · ${x.used ? 'last used ' + ago(x.used) : 'not used yet'}${x.ro ? ' · read only' : ''}`, `<button class="btn sm" type="button" data-ai-off="${esc(x.id)}">Disconnect</button>`);
+  sheet(`<h3>AI assistants</h3><p style="margin:-6px 0 0">Ask Claude, Muse or ChatGPT “how much did I spend on dining?” Add Budget it to your assistant as a connector with your link. It signs in as you, sees only your budget, can’t move money and never sees bank passwords.</p>
+  <div class="card mini"><b>Your connector link</b><div class="keyrow"><code>${esc(a.url)}</code><button class="btn sm" type="button" id="aiCopy">Copy</button></div></div>
+  <details><summary style="font-weight:800;cursor:pointer">How to add it to Claude</summary><ol class="small" style="margin:8px 0 0;padding-left:20px"><li>In Claude, open Settings, then Connectors, and tap Add custom connector.</li><li>Name it Budget it and paste your link.</li><li>Tap Connect. Budget it opens. Check it sends access to claude.ai, then tap Allow (if it asks, sign in with your own name and password first).</li><li>In a chat, turn Budget it on in the tools menu.</li></ol>
+  <p class="small muted" style="margin:6px 0 0">Muse and ChatGPT work the same way. If your assistant asks for an API key or token instead, make a key below.</p></details>
+  ${a.list.length ? `<div class="card loose">${a.list.map(item).join('')}</div>` : '<p class="note">No assistants connected yet.</p>'}
+  <p class="small muted" style="margin:0">Unused keys stop working after ${a.idleDays || 90} days, and so does an assistant nobody has used for that long. Connect it again any time.</p>
+  <div id="aiForm" style="display:contents"></div>
+  <div class="btns"><button class="btn" type="button" id="aiKey">Make a key</button>${a.list.length > 1 ? '<button class="btn" type="button" id="aiAll">Disconnect all</button>' : ''}<button class="btn primary" type="button" data-close>Done</button></div>`, root => {
+    root.querySelector('#aiCopy').onclick = () => copyText(a.url, 'Link copied');
+    root.querySelectorAll('[data-ai-off]').forEach(b => b.onclick = async () => { if (!confirmTap(b, 'Tap again')) return;
+      try { await call('/api/assistants/remove', { id: b.dataset.aiOff }); toast('Disconnected', false); assistantsSheet(); } catch (e) { toast(e.message, false); } });
+    const all = root.querySelector('#aiAll');
+    if (all) all.onclick = async () => { if (!confirmTap(all, 'Tap again to disconnect all')) return;
+      try { await call('/api/assistants/remove', { id: 'all' }); toast('All assistants disconnected', false); assistantsSheet(); } catch (e) { toast(e.message, false); } };
+    const form = root.querySelector('#aiForm');
+    root.querySelector('#aiKey').onclick = () => miniForm(form, `<label class="f">What it’s for<input class="inp" id="aiName" maxlength="40" placeholder="Muse on my phone"></label>
+      <label class="chk"><input type="checkbox" id="aiRo"><span><b>Read only</b><br><span class="muted small">It can look at your budget but not change anything.</span></span></label>
+      <p class="small muted" style="margin:0">A key works like your password for one assistant. You see it once. Disconnect it here any time.</p>`, 'Make key', async () => {
+        const r = await call('/api/assistants/key', { name: form.querySelector('#aiName').value, readOnly: form.querySelector('#aiRo').checked });
+        const withKey = r.url + '?key=' + encodeURIComponent(r.key);
+        form.innerHTML = `<div class="card mini"><b>Your key</b><p class="small muted" style="margin:0">Copy it now. It won’t be shown again. Paste it where your assistant asks for an API key or bearer token, with your connector link as the server address.</p>
+        <div class="keyrow"><code>${esc(r.key)}</code><button class="btn sm" type="button" id="aiKc">Copy</button></div>
+        <p class="small muted" style="margin:0">Only if it has no place for a key, use the link with the key in it. Keep that link private.</p><button class="btn sm" type="button" id="aiKl">Copy the link with the key in it</button>
+        <div class="btns"><button class="btn primary" type="button" id="aiDone">I copied it</button></div></div>`;
+        form.querySelector('#aiKc').onclick = () => copyText(r.key, 'Key copied');
+        form.querySelector('#aiKl').onclick = () => copyText(withKey, 'Link with key copied');
+        form.querySelector('#aiDone').onclick = () => assistantsSheet();
+      });
+  });
+}
 async function signInSheet() {
   let a; try { a = await call('/api/account'); } catch (e) { return toast(e.message, false); }
   const o = a.options || {};
@@ -1491,8 +1656,12 @@ async function signInSheet() {
   <div class="btns"><button class="btn" type="button" id="acOut">Sign out on all devices</button><button class="btn primary" type="button" data-close>Done</button></div>`, root => {
     const form = root.querySelector('#acForm'), val = id => form.querySelector(id)?.value || '';
     const em = root.querySelector('#acEmail');
-    if (em) em.onclick = () => miniForm(form, `<label class="f">Your email<input class="inp" id="acE" type="email" autocomplete="email" inputmode="email" value="${esc(a.pendingEmail || a.email || '')}"></label>`, 'Send link',
-      async () => { const r = await call('/api/account/email', { email: val('#acE') }); toast(r.pending ? 'Check your inbox for the link' : 'Saved', false); signInSheet(); });
+    // An email can reset your password, so changing it asks for your password (or a sign-in code) first
+    if (em) em.onclick = () => miniForm(form, `<label class="f">Your email<input class="inp" id="acE" type="email" autocomplete="email" inputmode="email" value="${esc(a.pendingEmail || a.email || '')}"></label>
+      ${a.hasPassword ? '<label class="f">Your current password<input class="inp" id="acEP" type="password" autocomplete="current-password"></label>'
+        : a.code ? '<label class="f">A code from your authenticator app<input class="inp" id="acEK" inputmode="numeric" autocomplete="one-time-code" autocapitalize="off"></label>'
+        : '<p class="small muted" style="margin:0">For your safety this works within 10 minutes of signing in. If it says so, sign out and in again first.</p>'}`, 'Send link',
+      async () => { const r = await call('/api/account/email', { email: val('#acE'), current: val('#acEP') || undefined, code: val('#acEK') || undefined }); toast(r.pending ? 'Check your inbox for the link' : 'Saved', false); signInSheet(); });
     const go = root.querySelector('#acGoogleOff');
     if (go) go.onclick = async () => { try { await call('/api/account/google', null, 'DELETE'); toast('Google disconnected', false); signInSheet(); } catch (e) { toast(e.message, false); } };
     root.querySelector('#acPw').onclick = () => miniForm(form, `${a.hasPassword ? '<label class="f">Current password<input class="inp" id="acC" type="password" autocomplete="current-password"></label>' : ''}
@@ -1522,8 +1691,68 @@ async function signInSheet() {
     };
     const out = root.querySelector('#acOut');
     out.onclick = async () => { if (!confirmTap(out, 'Tap again to sign out everywhere')) return;
-      try { await call('/api/account/signout-all', {}); location.href = '/login'; } catch (x) { toast(x.message, false); } };
+      try { await call('/api/account/signout-all', {}); signOut('/login', true); } catch (x) { toast(x.message, false); } };
   });
+}
+
+// ---------- people and friends: your @tag, finding people already here, requests, your friend link, open invites ----------
+// You find someone by their exact @tag or the email they checked, never by browsing, and they accept.
+// A friend link (or its QR code) skips the asking: sharing it is the yes. Friends come first when you share an account.
+let FREQS = 0;
+async function loadFriendReqs() { try { FREQS = (await call('/api/friends/requests')).incoming.length; } catch {} }
+const loadQr = () => window.qrSvg ? Promise.resolve() : new Promise((ok, no) => { const s = document.createElement('script'); s.src = '/qr.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+async function friendsSheet() {
+  let a, fr, inv;
+  try { [a, fr, inv] = await Promise.all([call('/api/account'), call('/api/friends/requests'), call('/api/invites')]); } catch (e) { return toast(e.message, false); }
+  FREQS = fr.incoming.length;
+  const who = r => `${esc(r.name)}${r.tag ? ' · @' + esc(r.tag) : ''}`;
+  sheet(`<h3>People and friends</h3>
+  <div class="card loose">${line('people', '--c3', 'Your tag', a.tag ? `<strong>@${esc(a.tag)}</strong> · people here find you with it` : 'Not set yet', '<button class="btn sm" type="button" id="frTag">Change</button>')}
+  ${line('people', '--c4', 'Your friend link', 'A link or QR code. Whoever opens it becomes your friend.', '<button class="btn sm" type="button" id="frLink">Show</button>')}</div>
+  <div id="frForm" style="display:contents"></div>
+  <label class="f">Find someone already on Budget it<span class="keyrow"><input class="inp" id="frQ" placeholder="@tag or their email" autocapitalize="off" autocomplete="off" spellcheck="false"><button class="btn" type="button" id="frFind">Find</button></span></label>
+  <div id="frOut" aria-live="polite" style="display:contents"></div>
+  ${fr.incoming.length ? `<b>Want to be friends</b><div class="card loose">${fr.incoming.map(r => line('people', '--c2', who(r), 'Asked ' + ago(r.at), `<span style="display:flex;gap:6px"><button class="btn sm primary" type="button" data-fr-yes="${esc(r.id)}">Accept</button><button class="btn sm" type="button" data-fr-no="${esc(r.id)}">Decline</button></span>`)).join('')}</div>` : ''}
+  ${fr.outgoing.length || inv.list.length ? `<b>Sent and waiting</b><div class="card loose">${fr.outgoing.map(r => line('people', '--c6', who(r), 'Friend request, asked ' + ago(r.at), `<button class="btn sm" type="button" data-fr-no="${esc(r.id)}">Take back</button>`)).join('')}
+    ${inv.list.map(i => line('file', '--c5', 'Invite link', `Made ${ago(i.at)}, not used yet`, `<button class="btn sm" type="button" data-inv-x="${esc(i.id)}">Cancel</button>`)).join('')}</div>` : ''}
+  <p class="small muted" style="margin:0">Someone new? An invite link gives them their own private budget, and makes you friends.</p>
+  <div class="btns"><button class="btn" type="button" data-act="invite">Make an invite link</button><button class="btn primary" type="button" data-close>Done</button></div>`, root => {
+    const form = root.querySelector('#frForm'), out = root.querySelector('#frOut'), q = root.querySelector('#frQ');
+    root.querySelector('#frTag').onclick = () => miniForm(form, `<label class="f">Your tag<input class="inp" id="frT" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="21" value="${esc(a.tag ? '@' + a.tag : '')}"></label>
+      <p class="small muted" style="margin:0">3 to 20 letters, numbers or _. Your old tag stops working.</p>`, 'Save',
+      async () => { const r = await call('/api/account/tag', { tag: form.querySelector('#frT').value }); toast('You’re @' + r.tag + ' now', false); friendsSheet(); });
+    root.querySelector('#frLink').onclick = () => friendLinkSheet();
+    const find = async () => { const v = q.value.trim(); if (!v) return;
+      try { const d = await call('/api/people/find', { q: v });
+        out.innerHTML = `<div class="card loose">${line('people', '--c3', who(d), d.friend ? 'Already your friend' : d.asked ? 'You asked. Waiting for them' : 'On this Budget it', d.friend || d.asked ? '' : '<button class="btn sm primary" type="button" id="frAsk">Add friend</button>')}</div>`;
+        const ask = out.querySelector('#frAsk');
+        if (ask) ask.onclick = async () => { busy(ask, true);
+          try { const r = await call('/api/friends/request', { to: d.uid }); toast(r.friends ? `You’re friends with ${d.name}` : `Sent. ${d.name} gets a request to accept`, false); if (r.friends) refresh(true); friendsSheet(); } catch (x) { toast(x.message, false); busy(ask, false); } };
+      } catch (x) { out.innerHTML = `<p class="note">${esc(x.message)}</p>`; } };
+    root.querySelector('#frFind').onclick = find; q.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); find(); } };
+    const act = (sel, fn) => root.querySelectorAll(sel).forEach(b => b.onclick = async () => { busy(b, true); try { await fn(b); refresh(true); friendsSheet(); } catch (x) { toast(x.message, false); busy(b, false); } });
+    act('[data-fr-yes]', b => call('/api/friends/answer', { id: b.dataset.frYes, yes: true }).then(() => toast('You’re friends now', false)));
+    act('[data-fr-no]', b => call('/api/friends/answer', { id: b.dataset.frNo, yes: false }).then(() => toast('Done', false)));
+    act('[data-inv-x]', b => call('/api/invites/cancel', { id: b.dataset.invX }).then(() => toast('Link cancelled', false)));
+  });
+}
+async function friendLinkSheet(fresh) {
+  let d; try { d = await call('/api/friends/link', fresh ? { fresh: true } : {}); } catch (x) { return toast(x.message, false); }
+  sheet(`<h3>Your friend link</h3><p style="margin:-6px 0 0">Your tag is <b>@${esc(d.tag)}</b>. Or let them scan this. Anyone on this Budget it who opens it becomes your friend right away, so only share it with people you know.</p>
+  <div class="qrbox" id="flQr" aria-label="QR code for your friend link"></div>
+  <div class="keyrow"><code>${esc(d.url)}</code><button class="btn sm" type="button" id="flCopy">Copy</button></div>
+  <p class="small muted" style="margin:0">Being friends doesn’t share anything. You still pick who sees each account.</p>
+  <div class="btns"><button class="btn" type="button" id="flNew">Make a new link</button><button class="btn primary" type="button" data-close>Done</button></div>`, root => {
+    root.querySelector('#flCopy').onclick = () => copyText(d.url, 'Link copied');
+    const nw = root.querySelector('#flNew'); nw.onclick = () => { if (!confirmTap(nw, 'Tap again: the old link stops working')) return; friendLinkSheet(true); };
+    const box = root.querySelector('#flQr'); loadQr().then(() => { box.innerHTML = window.qrSvg(d.url); }, () => { box.innerHTML = '<p class="note">The QR code didn’t load. Copy the link instead.</p>'; });
+  });
+}
+// Someone opened your friend link: /#add=TOKEN (kept through signing in)
+async function useFriendLink() {
+  const m = location.hash.match(/(?:^#|&)add=([A-Za-z0-9_-]{10,})/); if (!m) return;
+  history.replaceState(history.state, '', location.pathname);
+  try { const d = await call('/api/friends/link/use', { token: m[1] }); toast(`You’re friends with ${d.name} now`, false); refresh(true); } catch (x) { toast(x.message, false); }
 }
 
 const fmtBytes = b => b >= 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b >= 1e6 ? (b / 1e6).toFixed(1) + ' MB' : Math.round((b || 0) / 1e3) + ' KB';
@@ -1532,11 +1761,13 @@ async function ownerSheet() {
   if (!LAPTOP || !VIEW.me.owner) return;
   let o; try { o = await call('/api/admin/overview'); } catch (e) { return toast(e.message, false); }
   const h = o.health, P = h.plaid, warn = [];
-  if (h.disk && h.disk.free < 2e9) warn.push(`Only ${fmtBytes(h.disk.free)} free on the laptop’s disk.`);
+  if (h.recovered) warn.push(`db.json was damaged when Budget it started ${ago(h.recovered.at)}, so the budgets were put back from ${h.recovered.from} (${new Date(h.recovered.copyAt).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}). Changes after that copy are missing.`);
+  if (h.diskWarning) warn.push(h.diskWarning);
+  else if (h.disk && h.disk.free < 2e9) warn.push(`Only ${fmtBytes(h.disk.free)} free on the laptop’s disk.`);
   if (!h.copyDir) warn.push('Backups only live on this laptop. Set BACKUP_COPY_DIR in budget-it.env to a USB drive or a synced folder, so a copy survives the disk.');
   else if (h.copyError) warn.push('The backup copy off the laptop failed: ' + h.copyError);
   else if (h.copyAt && Date.now() - h.copyAt > 3 * 864e5) warn.push('The backup copy off the laptop is more than 3 days old.');
-  if (h.copyDir && !h.copyLocked) warn.push('The copies off the laptop aren’t locked. Set BACKUP_PASSPHRASE in budget-it.env so nobody who finds the drive can read them.');
+  if (h.copyDir && !h.copyLocked) warn.push('The copies off the laptop aren’t locked. Set BACKUP_PASSPHRASE in budget-it.env so nobody who finds the drive can read them.' + (h.copyNote ? ' ' + h.copyNote : ''));
   if (!h.email) warn.push('Email isn’t set up, so a forgotten password goes through you: tap the person, then Make a reset link.');
   if (P.errors) warn.push(`${P.errors} bank connection${P.errors === 1 ? ' needs' : 's need'} signing in again.`);
   if (P.limit && P.used >= P.limit - 2) warn.push(`${P.used} of the ${P.limit} bank connections on Plaid’s free plan are used.`);
@@ -1544,7 +1775,7 @@ async function ownerSheet() {
   const up = ago(Date.now() - h.uptime).replace(' ago', '').replace('just now', 'a moment');
   sheet(`<h3>People, backups and health</h3>
   <div id="owUpdate" style="display:contents"></div>
-  ${warn.length ? `<p class="warnbox">${warn.map(esc).join('<br>')}</p>` : ''}
+  ${warn.length ? `<p class="warnbox">${warn.map(esc).join('<br>')}</p>` : ''}${h.recovered ? '<div class="btns"><button class="btn sm" type="button" id="owSeen">Got it, hide the note about db.json</button></div>' : ''}
   <div class="stats">${stat('v' + esc(h.version), 'on Node ' + esc(h.node))}${stat(up, 'running for')}${stat(fmtBytes(h.dbBytes), 'of budgets')}${stat(h.receipts, 'receipt photos, ' + fmtBytes(h.receiptBytes))}${h.disk ? stat(fmtBytes(h.disk.free), 'free on disk') : ''}${stat(ago(h.lastBackupAt), 'last backup')}${h.copyDir ? stat(ago(h.copyAt), 'copy off the laptop') : ''}${stat(P.configured ? P.banks : 'off', P.configured ? 'banks connected' + (P.limit ? `, ${P.used} of ${P.limit} used` : P.env === 'production' ? '' : ' (test mode)') : 'bank connections')}</div>
   <p class="small muted" style="margin:0">You see who is here and whether things are working. You never see anyone else’s accounts, charges or budgets.</p>
   <b>People (${o.people.length})${o.invites ? ` · ${o.invites} open invite${o.invites === 1 ? '' : 's'}` : ''}</b>
@@ -1558,17 +1789,21 @@ async function ownerSheet() {
     const form = root.querySelector('#owForm');
     root.querySelectorAll('[data-person]').forEach(b => b.onclick = () => personSheet(o.people.find(p => p.id === b.dataset.person)));
     call('/api/admin/update').then(u => { const el = root.querySelector('#owUpdate'); if (!el || !u || !u.newer) return;
-      el.innerHTML = `<p class="warnbox">Budget it v${esc(u.latest)} is out. This laptop runs v${esc(u.current)}. ${u.url ? `<a href="${esc(u.url)}" target="_blank" rel="noopener">See what’s new</a>. ` : ''}To update, on the laptop: <code>git pull</code>, then <code>bash install.sh</code>.</p>`; }).catch(() => {});
+      el.innerHTML = `<p class="warnbox">${u.security ? '<b style="color:var(--bad)">Security update.</b> ' : ''}Budget it v${esc(u.latest)} is out. This laptop runs v${esc(u.current)}. ${u.url ? `<a href="${esc(u.url)}" target="_blank" rel="noopener">See what’s new</a>. ` : ''}To update, on the laptop: <code>git pull</code>, then <code>bash install.sh</code>.</p>`; }).catch(() => {});
     root.querySelector('#owDown').onclick = () => {
       miniForm(form, `<label class="f">Lock it with a passphrase<input class="inp" id="owPass" type="password" autocomplete="new-password" placeholder="At least 8 characters"></label>
         <p class="small muted" style="margin:0">Anyone who opens an unlocked backup can read every budget in it and use the bank connections. A locked one can only be opened with this passphrase, so don’t lose it: there is no way to get it back.</p>
-        <a class="small" href="/api/admin/backup" download>Download without a lock</a>`, 'Download locked', async () => {
+        <a class="small" href="/api/admin/backup" download id="owPlain">Download without a lock</a>`, 'Download locked', async () => {
         const passphrase = form.querySelector('#owPass').value; if (passphrase.length < 8) throw new Error('Use at least 8 characters for the passphrase.');
         const r = await fetch('/api/admin/backup', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ passphrase }) });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Couldn’t make the backup.');
         saveBlob(await r.blob(), `budget-it-backup-${TODAY}.locked`); form.innerHTML = ''; toast('Backup downloaded, locked with your passphrase', false);
       });
+      // an unlocked one holds every budget and the bank key: a second tap, with that said on the link itself
+      const plainA = form.querySelector('#owPlain');
+      plainA.onclick = e => { if (!plainA.dataset.armed) { e.preventDefault(); plainA.dataset.armed = '1'; plainA.textContent = 'Tap again: it isn’t locked, and holds every budget and the key to the bank connections'; } };
     };
+    const seenB = root.querySelector('#owSeen'); if (seenB) seenB.onclick = async () => { try { await call('/api/admin/recovery-seen', {}); if (VIEW.ownerNotes) VIEW.ownerNotes.recovered = null; close(); ownerSheet(); } catch (e) { toast(e.message, false); } };
     const cp = root.querySelector('#owCopy'); if (cp) cp.onclick = async () => { busy(cp, true); try { await call('/api/admin/copy-now', {}); toast('Copied off the laptop', false); } catch (e) { toast(e.message, false); } busy(cp, false); };
     const file = root.querySelector('#owFile');
     root.querySelector('#owRestore').onclick = () => file.click();
@@ -1619,24 +1854,30 @@ function personSheet(p) {
       box.querySelector('#ppCopy').onclick = () => copyText(r.url, 'Reset link copied'); });
     root.querySelector('#ppRename').onclick = () => miniForm(box, `<label class="f">New sign-in name<input class="inp" id="ppName" maxlength="30" value="${esc(p.name)}"></label>`, 'Save',
       async () => { await call('/api/admin/rename', { id: p.id, name: box.querySelector('#ppName').value }); toast('Saved', false); ownerSheet(); });
-    root.querySelector('#ppOut').onclick = () => tryIt(async () => { const r = await call('/api/admin/signout', { id: p.id }); toast(`Signed out of ${r.sessions} device${r.sessions === 1 ? '' : 's'}`, false); if (me) location.href = '/login'; });
+    const ppOut = root.querySelector('#ppOut'); ppOut.onclick = () => { if (!confirmTap(ppOut.querySelector('b'), me ? 'Tap again: this signs you out too' : 'Tap again to sign them out')) return; tryIt(async () => { const r = await call('/api/admin/signout', { id: p.id }); toast(`Signed out of ${r.sessions} device${r.sessions === 1 ? '' : 's'}`, false); if (me) location.href = '/login'; }); };
     const cd = root.querySelector('#ppCode'); if (cd) cd.onclick = () => { if (!confirmTap(cd.querySelector('b'), 'Tap again to turn it off')) return; tryIt(async () => { await call('/api/admin/code-off', { id: p.id }); toast('Sign-in code turned off', false); ownerSheet(); }); };
     const ow = root.querySelector('#ppOwner'); if (ow) ow.onclick = () => tryIt(async () => { await call('/api/admin/owner', { id: p.id, owner: !p.owner }); toast(p.owner ? 'They no longer run it' : 'They run it too now', false); ownerSheet(); });
     const rm = root.querySelector('#ppRemove'); if (rm) rm.onclick = () => { if (!confirmTap(rm.querySelector('b'), `Remove ${p.name} for good? Tap again`)) return; tryIt(async () => { await call('/api/admin/remove', { id: p.id }); toast(`Removed ${p.name}`, false); ownerSheet(); }); };
   });
 }
 function whatsnew() {
-  sheet(`<span><span class="ver">v1.0.0</span> <span class="muted small" style="font-weight:700">November 2026</span></span><h3>Meet Budget it</h3>
-  <p style="margin:-4px 0 0">Your whole money picture, kept on your own laptop. Every account in one place, a budget that keeps up by itself, and a guide who tells you how the month is going.</p>
-  <div class="facts"><div>${svg('bank', '')}<span><b>Every account, every month</b>Balances and charges come in through Plaid, read only, with trends across all your history.</span></div><div>${svg('cal', '')}<span><b>Safe to spend until payday</b>What's free after bills, worked out from your own paycheques.</span></div><div>${svg('people', '')}<span><b>Works with Split it</b>Send a charge to Split it to share it with your household.</span></div></div>
-  <div class="rel"><h4>New</h4><ul><li>Accounts and net worth from Plaid, plus CSV import with a preview first.</li><li>Every month of history, and trends over 12 months: your usual month and what stood out.</li><li>Monthly budgets with rollover, carry-over of overspending, a per-day amount and suggestions.</li><li>Your own categories, and rules that match the start of a name or anywhere in it.</li><li>Transfers between your accounts are matched so they don't count as spending.</li><li>Hide a charge, tag charges like #japan-trip, split one across categories, add a receipt photo.</li><li>Your year in review, net worth over time, and a payoff planner for cards and loans.</li><li>Investment holdings with their value and gain, from your bank or added by hand.</li><li>Accounts in other currencies, like a US dollar account, added up in your home currency.</li><li>Change many charges at once, and search every month by name, note, amount or #tag.</li><li>Bills and subscriptions found from repeat charges, plus ones you add, monthly or yearly.</li><li>Heads-ups for big charges, new subscriptions, price increases and low chequing.</li><li>Savings goals, including goals that follow a savings account.</li><li>A Sunday check-in on your week, and nudges before a budget runs out.</li><li>Hide amounts with one tap, and export everything as a CSV.</li><li>Household sharing, quick add for cash, and Luffy and Hancock as guides.</li><li>Its own assistant connection: ask Claude or Muse about your money.</li><li>Send a charge to Split it and count only your share in your budget.</li><li>Your sign-in in Settings: change your password, add an email, and turn on a sign-in code from an authenticator app.</li><li>For whoever runs it: a page with people, reset links, health, backups and restore.</li><li>Today's rates for any home currency, not just CAD.</li></ul>
+  sheet(`<span><span class="ver">v1.1.0</span> <span class="muted small" style="font-weight:700">November 2026</span></span><h3>Safer to run, kinder to your history</h3>
+  <p style="margin:-4px 0 0">Disconnecting a bank keeps its history, each person gets their own wrong-password limit, and you can connect your own AI assistant from Settings.</p>
+  <div class="facts"><div>${svg('bank', '')}<span><b>Your history stays</b>Disconnect a bank and its charges and your edits stay. Reconnect it and the history carries on.</span></div><div>${svg('people', '')}<span><b>Find your people</b>An @tag, a friend link with a QR code, and accounts shared only with the people you pick.</span></div><div>${svg('lock', '')}<span><b>Your data, your call</b>Download your data or delete it, and give an assistant read-only access.</span></div></div>
+  <div class="rel"><h4>New</h4><ul><li>AI assistants in Settings: your connector link, one-tap Allow, read-only keys, and Disconnect.</li><li>People and friends: your @tag, find people by @tag or email, friend requests and a friend link with a QR code.</li><li>Share an account with the people you pick, instead of everyone here.</li><li>Disconnecting a bank keeps its history, and reconnecting carries it on with no doubles.</li><li>A heads-up when a bank needs you to sign in again, or a charge changes after you split it.</li><li>Download my data, and delete my data.</li></ul>
+  <h4>Improved</h4><ul><li>New banks bring up to two years of history.</li><li>Changes made offline that couldn’t be saved are shown to you instead of vanishing.</li><li>A sign-in you keep using stays signed in.</li><li>Extra safety copies of your budget at every start and every 6 hours.</li></ul>
+  <h4>Fixed</h4><ul><li>One person’s wrong passwords no longer lock everyone out.</li><li>A full disk no longer stops the app.</li><li>Assistants can always connect, and a retry can’t add the same thing twice.</li><li>Much faster with years of history, and the phone app works offline and tells you when a new version is ready.</li><li>Sending to Split it works with trip groups in other currencies and never counts your share twice.</li><li>Lots of smaller fixes to CSV import, bills, reminders, undo and the look on phones and laptops.</li></ul>
+  <h4>Security</h4><ul><li>Changes from other websites are refused, sign-ins are stored hashed, and changing your email needs your password.</li><li>Unused assistant keys stop working after 90 days.</li><li>Backup copies leave out the bank key until they’re locked with a passphrase.</li></ul></div>
+  <details class="rel"><summary><b>v1.0.0 · Meet Budget it</b></summary><div><h4>New</h4><ul><li>Accounts and net worth from Plaid, plus CSV import with a preview first.</li><li>Every month of history, and trends over 12 months: your usual month and what stood out.</li><li>Monthly budgets with rollover, carry-over of overspending, a per-day amount and suggestions.</li><li>Your own categories, and rules that match the start of a name or anywhere in it.</li><li>Transfers between your accounts are matched so they don't count as spending.</li><li>Hide a charge, tag charges like #japan-trip, split one across categories, add a receipt photo.</li><li>Your year in review, net worth over time, and a payoff planner for cards and loans.</li><li>Investment holdings with their value and gain, from your bank or added by hand.</li><li>Accounts in other currencies, like a US dollar account, added up in your home currency.</li><li>Change many charges at once, and search every month by name, note, amount or #tag.</li><li>Bills and subscriptions found from repeat charges, plus ones you add, monthly or yearly.</li><li>Heads-ups for big charges, new subscriptions, price increases and low chequing.</li><li>Savings goals, including goals that follow a savings account.</li><li>A Sunday check-in on your week, and nudges before a budget runs out.</li><li>Hide amounts with one tap, and export everything as a CSV.</li><li>Household sharing, quick add for cash, and Luffy and Hancock as guides.</li><li>Its own assistant connection: ask Claude or Muse about your money.</li><li>Send a charge to Split it and count only your share in your budget.</li><li>Your sign-in in Settings: change your password, add an email, and turn on a sign-in code from an authenticator app.</li><li>For whoever runs it: a page with people, reset links, health, backups and restore.</li><li>Today's rates for any home currency, not just CAD.</li></ul>
   <h4>Security</h4><ul><li>Bank connections are encrypted on your laptop and never leave it.</li><li>Receipt photos are kept on the laptop and only you can see yours.</li><li>Invite-only sign-in, the same as Split it, with an optional sign-in code as a second step.</li><li>Backups you can lock with a passphrase, and a locked copy to a second place every day.</li><li>Changing or resetting a password signs out your other phones at once.</li><li>Whoever runs it sees who is here and whether things work, never anyone's money.</li></ul>
   <h4>Known issues</h4><ul><li>New charges arrive every few hours, not instantly.</li><li>Plaid's free plan allows 10 bank connections for the whole laptop, and a disconnected bank still counts.</li><li>Coming back from a bank that approves the connection in its own app hasn't been tried with a real bank yet.</li></ul></div>
+</details>
   <div class="btns"><button class="btn primary" type="button" data-close>Got it</button></div>`);
 }
 
 let selecting = false, picked = new Set();
 document.addEventListener('click', e => {
+  const so = e.target.closest('[data-signout]'); if (so) { e.preventDefault(); return signOut(); }
   const el = e.target.closest('[data-year],[data-yc],[data-trend],[data-tab],[data-go],[data-sub],[data-back],[data-txn],[data-bud],[data-goal],[data-acct],[data-act],[data-f],[data-month],[data-search],[data-bill],[data-fix],[data-unlink],[data-alert],[data-close]');
   if (!el || e.target.closest('[data-guide],[data-cat],[data-scat],[data-delrule],[data-grp],[data-icon],[data-color],[data-to],[data-rule],[data-catedit]')) return;
   if (el.matches('[data-close]')) return close();
@@ -1655,15 +1896,15 @@ document.addEventListener('click', e => {
   if (d.txn && selecting) { picked.has(d.txn) ? picked.delete(d.txn) : picked.add(d.txn); render(); return; }
   if (d.txn) return editTxn(d.txn); if (d.bud) return editBudget(d.bud); if (d.goal) return addGoal(d.goal); if (d.acct) return editAcct(d.acct); if (d.bill) return billSheet(d.bill);
   if (d.fix) { if (!LAPTOP) return; return openLink(d.fix); }
-  if (d.unlink) { const it = VIEW.items.find(i => i.id === d.unlink); return sheet(`<h3>Disconnect ${esc(it.inst)}?</h3><p style="margin:-6px 0 0">Its accounts and transactions are removed from Budget it, and the connection is deleted at Plaid. Your budgets and rules stay.</p>${VIEW.plaid.limit ? `<p class="note">This doesn’t give the connection back. Plaid’s free plan allows ${VIEW.plaid.limit} and ${VIEW.plaid.used} ${VIEW.plaid.used === 1 ? 'is' : 'are'} used, so adding this bank again later uses another one. If it only stopped updating, close this and use Reconnect instead.</p>` : ''}<div class="btns"><button class="btn primary" type="button" id="ok">Disconnect</button><button class="btn" type="button" data-close>Cancel</button></div>`, root => root.querySelector('#ok').onclick = () => { close(); post('/api/plaid/remove', { item: it.id }); }); }
+  if (d.unlink) { const it = VIEW.items.find(i => i.id === d.unlink); return sheet(`<h3>Disconnect ${esc(it.inst)}?</h3><p style="margin:-6px 0 0">The connection is deleted here and at Plaid, so nothing new comes in. Its accounts and transactions stay, marked disconnected, with your categories, notes and splits. You can delete that history from each account afterwards.</p>${VIEW.plaid.limit ? `<p class="note"><b>Reconnecting this bank later will use another one</b> of your ${VIEW.plaid.limit} free bank connections (${Math.max(0, VIEW.plaid.limit - VIEW.plaid.used)} left). If it only stopped updating, close this and use Reconnect instead.</p>` : ''}<div class="btns"><button class="btn primary" type="button" id="ok">Disconnect</button><button class="btn" type="button" data-close>Cancel</button></div>`, root => root.querySelector('#ok').onclick = () => { close(); post('/api/plaid/remove', { item: it.id }); }); }
   const bulk = args => { const ids = [...picked]; picked = new Set(); selecting = false; api('txn.bulk', { ids, ...args }); };
   ({ add: () => addSheet(), poke: () => { poke++; celebrate = null; render(); }, review, plaid, csv, rules, cats, whatsnew, settings, income, newgoal: newGoal, invite, push: pushOn,
-    safe: safeSheet, addbill: () => billForm(null), export: exportCsv, money: moneySheet, signin: signInSheet, owner: ownerSheet,
+    safe: safeSheet, addbill: () => billForm(null), export: exportCsv, money: moneySheet, signin: signInSheet, friends: friendsSheet, assistants: assistantsSheet, owner: ownerSheet, mydata: myDataSheet, ownernote: ownerNoteSheet,
     private: () => { PRIVATE = !PRIVATE; store.set('bi-private', PRIVATE); close(); render(); toast(PRIVATE ? 'Amounts are hidden. Tap the eye to show them.' : 'Amounts are showing', false); },
     splitit: () => { close(); if (LAPTOP) return splitConnect(); if (CLOUD) return toast('Sending to Split it works in the laptop app, where both apps run.', false); toast('On the laptop, connect Split it here, then use "Split it with someone" on any charge.', false); },
     select: () => { selecting = true; picked = new Set(); render(); }, selectoff: () => { selecting = false; picked = new Set(); render(); },
-    bulkcat: () => sheet(`<h3>Move ${picked.size} to</h3>${catButtons('')}<div class="btns"><button class="btn" type="button" data-close>Cancel</button></div>`, root => root.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { close(); bulk({ c: b.dataset.cat }); })),
-    bulktag: () => sheet(`<h3>Tag ${picked.size}</h3><label class="f">Tag<input class="inp" id="tg" placeholder="#japan-trip"></label><div class="btns"><button class="btn primary" type="button" id="ok">Add tag</button><button class="btn" type="button" data-close>Cancel</button></div>`, root => root.querySelector('#ok').onclick = () => { const v = root.querySelector('#tg').value.trim(); if (!v) return; close(); bulk({ tag: v }); }),
+    bulkcat: () => sheet(`<h3>Move ${picked.size} charge${picked.size === 1 ? '' : 's'} to</h3>${catButtons('')}<div class="btns"><button class="btn" type="button" data-close>Cancel</button></div>`, root => root.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { close(); bulk({ c: b.dataset.cat }); })),
+    bulktag: () => sheet(`<h3>Tag ${picked.size} charge${picked.size === 1 ? '' : 's'}</h3><label class="f">Tag<input class="inp" id="tg" placeholder="#japan-trip"></label><div class="btns"><button class="btn primary" type="button" id="ok">Add tag</button><button class="btn" type="button" data-close>Cancel</button></div>`, root => root.querySelector('#ok').onclick = () => { const v = root.querySelector('#tg').value.trim(); if (!v) return; close(); bulk({ tag: v }); }),
     bulkhide: () => bulk({ hidden: true }),
     more: () => { shown += 200; render(); }, suggest: () => api('budget.suggest'), sample: () => api('sample.load'), unsample: () => { close(); api('sample.clear'); },
     sync: async () => { toast('Asking your banks…', false); await post('/api/plaid/sync'); },
@@ -1677,7 +1918,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') return close();
   // Tab stays inside an open sheet, so keyboard and screen reader users don't wander behind it
   if (e.key === 'Tab') {
-    const f = [...L.querySelectorAll('.sheet button:not([disabled]),.sheet input,.sheet select,.sheet a[href],.sheet label.btn')].filter(x => x.offsetParent !== null);
+    const f = [...L.querySelectorAll('.sheet button:not([disabled]),.sheet input,.sheet select,.sheet textarea,.sheet summary,.sheet a[href],.sheet label.btn')].filter(x => x.offsetParent !== null);
     if (!f.length) return;
     const first = f[0], last = f[f.length - 1];
     if (e.shiftKey && (document.activeElement === first || !L.contains(document.activeElement))) { e.preventDefault(); last.focus(); }

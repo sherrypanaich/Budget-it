@@ -31,15 +31,27 @@ module.exports = function makePlaid({ keyFile }) {
 
   // ---------- encryption for access tokens ----------
   let key;
+  // The key file, or null when there is none yet. A file that is there but can't be read or is damaged throws:
+  // making a new key in its place would lock every bank connection away for good.
+  function readKeyFile() {
+    let raw; try { raw = fs.readFileSync(keyFile, 'utf8'); } catch (e) { if (e.code === 'ENOENT') return null; throw Object.assign(new Error(`Can’t read ${keyFile} (${e.code || e.message})`), { code: 'BAD_KEY' }); }
+    const k = Buffer.from(raw.trim(), 'base64');
+    if (k.length !== 32 || !/^[A-Za-z0-9+/]+=*$/.test(raw.trim())) throw Object.assign(new Error(`${keyFile} is damaged`), { code: 'BAD_KEY' });
+    return k;
+  }
   function getKey() {
     if (key) return key;
     const fromEnv = env('BUDGET_IT_KEY');
     if (fromEnv) { key = crypto.createHash('sha256').update(fromEnv).digest(); return key; }
-    try { key = Buffer.from(fs.readFileSync(keyFile, 'utf8').trim(), 'base64'); if (key.length === 32) return key; } catch {}
-    key = crypto.randomBytes(32);
-    fs.writeFileSync(keyFile, key.toString('base64'), { mode: 0o600 });
-    return key;
+    const found = readKeyFile(); if (found) return (key = found);
+    // Only when there is no file at all: 'wx' never writes over one that appeared in the meantime.
+    const fresh = crypto.randomBytes(32);
+    try { fs.writeFileSync(keyFile, fresh.toString('base64'), { mode: 0o600, flag: 'wx' }); }
+    catch (e) { if (e.code === 'EEXIST') return getKey(); try { if (!fs.readFileSync(keyFile, 'utf8').trim()) fs.unlinkSync(keyFile); } catch {} throw e; }
+    return (key = fresh);
   }
+  // Why the key can't be used (a message), or null when it's fine or not made yet.
+  const keyProblem = () => { if (env('BUDGET_IT_KEY')) return null; try { readKeyFile(); return null; } catch (e) { return e.message; } };
   const forgetKey = () => { key = null; };   // after a restore put a different secret.key in place
   function seal(text) {
     const iv = crypto.randomBytes(12), c = crypto.createCipheriv('aes-256-gcm', getKey(), iv);
@@ -54,6 +66,9 @@ module.exports = function makePlaid({ keyFile }) {
   }
 
   // ---------- API calls ----------
+  // Errors that mean the bank needs the person to sign in again in Plaid Link (update mode). Nothing else fixes them.
+  const LOGIN = new Set(['ITEM_LOGIN_REQUIRED', 'PENDING_EXPIRATION', 'PENDING_DISCONNECT', 'ITEM_LOCKED', 'USER_SETUP_REQUIRED', 'INVALID_CREDENTIALS', 'INVALID_MFA', 'INVALID_UPDATED_USERNAME']);
+  const needsLogin = code => LOGIN.has(code);
   async function call(endpoint, body) {
     if (!configured) throw Object.assign(new Error('Plaid isn’t set up yet. Add PLAID_CLIENT_ID and PLAID_SECRET to budget-it.env, then restart.'), { code: 'NOT_CONFIGURED' });
     let r;
@@ -63,15 +78,16 @@ module.exports = function makePlaid({ keyFile }) {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) {
       const code = j.error_code || 'PLAID_ERROR';
-      const msg = code === 'ITEM_LOGIN_REQUIRED' ? 'Your bank wants you to sign in again. Tap Reconnect.'
+      const msg = LOGIN.has(code) ? 'Your bank wants you to sign in again. Tap Reconnect.'
         : j.display_message || j.error_message || `Plaid said no (${code}).`;
       throw Object.assign(new Error(msg), { code, status: r.status });
     }
     return j;
   }
+  // A new connection asks for up to two years of history (730 days is Plaid's most); banks send what they have.
   const linkToken = (uid, accessToken) => call('/link/token/create', {
     client_name: 'Budget it', language: 'en', country_codes: COUNTRIES, user: { client_user_id: uid }, ...(redirect ? { redirect_uri: redirect } : {}),
-    ...(accessToken ? { access_token: accessToken } : { products: ['transactions'], optional_products: ['investments'], transactions: { days_requested: 180 } })
+    ...(accessToken ? { access_token: accessToken } : { products: ['transactions'], optional_products: ['investments'], transactions: { days_requested: 730 } })
   }).then(j => j.link_token);
   const exchange = publicToken => call('/item/public_token/exchange', { public_token: publicToken });
   const accounts = accessToken => call('/accounts/get', { access_token: accessToken });
@@ -94,5 +110,5 @@ module.exports = function makePlaid({ keyFile }) {
     }
     return { added, modified, removed, cursor: next };
   }
-  return { configured, env: ENV, redirect, forgetKey, seal, open, linkToken, exchange, accounts, remove, holdings, recurring, sync };
+  return { configured, env: ENV, redirect, needsLogin, forgetKey, keyProblem, seal, open, linkToken, exchange, accounts, remove, holdings, recurring, sync };
 };

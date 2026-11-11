@@ -24,7 +24,7 @@ node server.js
 node --test test/*.test.js
 ```
 
-The tests run the real server against a stand-in Plaid, so they need no keys. `test/server.test.js` covers budgets, banks and the assistant; `test/safety.test.js` covers signing in, the owner's page, backups and the laptop commands.
+The tests run the real server against a stand-in Plaid, so they need no keys. `test/server.test.js` covers budgets, banks and the assistant; `test/safety.test.js` covers signing in, the owner's page, backups and the laptop commands. `test/upgrade.test.js` opens a data folder and a backup made by Budget it 1.0.0 (`test/fixtures/v1.0.0`, made with `test/fixtures/make-v1.0.0.js`); a change to what's saved on disk has to keep that working.
 
 ## Layout
 
@@ -48,4 +48,4 @@ Versions follow `vMAJOR.MINOR.PATCH`: a patch for fixes only, a minor for new fe
 
 1. Add a section to the top of `CHANGELOG.md`, headed `## vX.Y.Z · Month D, YYYY`, with a bold one-line headline, then Highlights, New, Improved, Fixed, Security and Known issues (leave out any that are empty).
 2. Set `VERSION` in `server.js` to the same number, and update the What's new card in `public/index.html`.
-3. After the pull request is merged, tag main (`git tag vX.Y.Z && git push origin vX.Y.Z`), or run the Release workflow from the Actions tab with the version. It publishes a GitHub Release titled "Budget it vX.Y.Z: headline" from that changelog section.
+3. After the pull request is merged, tag main (`git tag vX.Y.Z && git push origin vX.Y.Z`), or run the Release workflow from the Actions tab with the version. It runs `scripts/smoke-docker.sh` first (build the image, sign in, restart, data and time zone still right), then publishes a GitHub Release titled "Budget it vX.Y.Z: headline" from that changelog section. Run the smoke test yourself before tagging if you changed `Dockerfile`, `compose.yaml` or `budget-it.env.example`.
