@@ -937,7 +937,7 @@ function accounts() {
   <div class="card"><div class="row" style="border:0">${ticK('bot', '--c6')}<span class="rt"><b>Ask Claude or Muse</b><small style="white-space:normal">"How much did I spend on dining this month?" Add Budget it as a connector with this address:</small></span><span></span></div>
   <div class="pad" style="padding-top:0"><code class="inp" style="display:block;font-family:var(--mono);font-size:.85rem;overflow-wrap:anywhere;box-shadow:none">${esc(LAPTOP ? location.origin + '/mcp' : 'https://your-laptop-address/mcp')}</code></div>
   ${[['get_balances', 'Balances and net worth'], ['list_transactions', 'Find transactions'], ['spending_summary', 'Spending by category for any month'], ['budget_status', "What's left in each budget"], ['list_goals', 'Savings goals'], ['set_category', "Change a transaction's category"], ['add_cash_purchase', 'Add something paid in cash'], ['add_to_goal', 'Record savings toward a goal'], ['safe_to_spend', 'Safe to spend until payday'], ['list_bills', 'Bills and subscriptions'], ['month_report', 'How a month went'], ['year_review', 'Your year in review'], ['payoff_plan', 'How long a card or loan takes to pay off'], ['set_budget', 'Set a budget'], ['update_price', 'Update a holding’s price'], ['create_goal', 'Create a goal'], ['refresh_banks', 'Update from banks now'], ['undo_last_change', 'Undo the last change']].map(([c, d]) => `<div class="tool"><code>${c}</code><span>${d}</span></div>`).join('')}
-  <p class="pad small muted" style="margin:0">It acts as you, can’t move money and never sees bank passwords.</p></div>`;
+  <p class="pad small muted" style="margin:0">It acts as you, can’t move money and never sees bank passwords.</p>${LAPTOP ? '<div class="pad" style="padding-top:8px"><button class="btn sm" type="button" data-act="assistants">Connect or manage assistants</button></div>' : ''}</div>`;
   if (WIDE()) return page.replace(/(<\/header>)/, '$1<div class="dash page"><div class="col-main">') + '</div><aside class="col-side">' + side + '</aside></div>';
   return page.replace('</section>', '</section>' + worthChart(nw)) + side.replace(worthChart(nw), '');
 }
@@ -1422,7 +1422,7 @@ function settings() {
   ${row('private', 'eye', '--c8', PRIVATE ? 'Show amounts' : 'Hide amounts', PRIVATE ? 'Amounts are blurred on this phone' : 'Blur every number, for checking in public')}
   ${row('splitit', 'people', '--c3', 'Split it', LAPTOP ? (VIEW.splitit ? 'Connected. Send charges to split' : 'Connect to send charges to split') : CLOUD ? 'Works in the laptop app' : 'Send charges to split with your household')}
   ${LAPTOP ? row('push', 'bell', '--c4', 'Phone notifications', 'Budgets, bills, a weekly check-in and alerts') + row('invite', 'people', '--c3', 'Invite someone', 'They get their own private budget')
-    + row('signin', 'lock', '--c6', 'Your sign-in', 'Password, email and a sign-in code') + (VIEW.me.owner ? row('owner', 'gear', '--c1', 'People, backups and health', 'For whoever runs this Budget it') : '') : ''}
+    + row('signin', 'lock', '--c6', 'Your sign-in', 'Password, email and a sign-in code') + row('assistants', 'bot', '--c6', 'AI assistants', 'Connect Claude, Muse or ChatGPT to your budget') + (VIEW.me.owner ? row('owner', 'gear', '--c1', 'People, backups and health', 'For whoever runs this Budget it') : '') : ''}
   ${row('export', 'file', '--c5', 'Export transactions', 'Everything as a CSV, for taxes or a spreadsheet')}
   ${row('whatsnew', 'star', '--c4', "What's new", 'v' + esc(VIEW.version))}
   ${S.sample ? row('unsample', 'x', '--c7', 'Remove sample data', 'Keeps your own accounts and anything you added') : ''}
@@ -1471,6 +1471,38 @@ function miniForm(box, html, label, go) {
   box.querySelector('#mfGo').onclick = async e => { const b = e.currentTarget, err = box.querySelector('#mfErr'); busy(b, true); err.hidden = true;
     try { await go(); } catch (x) { err.textContent = x.message; err.hidden = false; busy(b, false); } };
   box.querySelectorAll('input').forEach(i => i.onkeydown = e => { if (e.key === 'Enter') box.querySelector('#mfGo').click(); });
+}
+// Your AI assistants: the connector link, keys you make yourself, and disconnecting them.
+async function assistantsSheet() {
+  let a; try { a = await call('/api/assistants'); } catch (e) { return toast(e.message, false); }
+  const item = x => line(x.kind === 'key' ? 'lock' : 'bot', '--c6', esc(x.name), `${x.kind === 'key' ? 'Key made' : 'Connected'} ${ago(x.since)} · ${x.used ? 'last used ' + ago(x.used) : 'not used yet'}`, `<button class="btn sm" type="button" data-ai-off="${esc(x.id)}">Disconnect</button>`);
+  sheet(`<h3>AI assistants</h3><p style="margin:-6px 0 0">Ask Claude, Muse or ChatGPT “how much did I spend on dining?” Add Budget it to your assistant as a connector with your link. It signs in as you, sees only your budget, can’t move money and never sees bank passwords.</p>
+  <div class="card mini"><b>Your connector link</b><div class="keyrow"><code>${esc(a.url)}</code><button class="btn sm" type="button" id="aiCopy">Copy</button></div></div>
+  <details><summary style="font-weight:800;cursor:pointer">How to add it to Claude</summary><ol class="small" style="margin:8px 0 0;padding-left:20px"><li>In Claude, open Settings, then Connectors, and tap Add custom connector.</li><li>Name it Budget it and paste your link.</li><li>Tap Connect. Budget it opens: sign in with your own name and password and tap Allow.</li><li>In a chat, turn Budget it on in the tools menu.</li></ol>
+  <p class="small muted" style="margin:6px 0 0">Muse and ChatGPT work the same way. If your assistant asks for an API key or token instead, make a key below.</p></details>
+  ${a.list.length ? `<div class="card loose">${a.list.map(item).join('')}</div>` : '<p class="note">No assistants connected yet.</p>'}
+  <div id="aiForm" style="display:contents"></div>
+  <div class="btns"><button class="btn" type="button" id="aiKey">Make a key</button>${a.list.length > 1 ? '<button class="btn" type="button" id="aiAll">Disconnect all</button>' : ''}<button class="btn primary" type="button" data-close>Done</button></div>`, root => {
+    root.querySelector('#aiCopy').onclick = () => copyText(a.url, 'Link copied');
+    root.querySelectorAll('[data-ai-off]').forEach(b => b.onclick = async () => { if (!confirmTap(b, 'Tap again')) return;
+      try { await call('/api/assistants/remove', { id: b.dataset.aiOff }); toast('Disconnected', false); assistantsSheet(); } catch (e) { toast(e.message, false); } });
+    const all = root.querySelector('#aiAll');
+    if (all) all.onclick = async () => { if (!confirmTap(all, 'Tap again to disconnect all')) return;
+      try { await call('/api/assistants/remove', { id: 'all' }); toast('All assistants disconnected', false); assistantsSheet(); } catch (e) { toast(e.message, false); } };
+    const form = root.querySelector('#aiForm');
+    root.querySelector('#aiKey').onclick = () => miniForm(form, `<label class="f">What it’s for<input class="inp" id="aiName" maxlength="40" placeholder="Muse on my phone"></label>
+      <p class="small muted" style="margin:0">A key works like your password for one assistant. You see it once. Disconnect it here any time.</p>`, 'Make key', async () => {
+        const r = await call('/api/assistants/key', { name: form.querySelector('#aiName').value });
+        const withKey = r.url + '?key=' + encodeURIComponent(r.key);
+        form.innerHTML = `<div class="card mini"><b>Your key</b><p class="small muted" style="margin:0">Copy it now. It won’t be shown again. Paste it where your assistant asks for an API key or bearer token, with your connector link as the server address.</p>
+        <div class="keyrow"><code>${esc(r.key)}</code><button class="btn sm" type="button" id="aiKc">Copy</button></div>
+        <p class="small muted" style="margin:0">Only if it has no place for a key, use the link with the key in it. Keep that link private.</p><button class="btn sm" type="button" id="aiKl">Copy the link with the key in it</button>
+        <div class="btns"><button class="btn primary" type="button" id="aiDone">I copied it</button></div></div>`;
+        form.querySelector('#aiKc').onclick = () => copyText(r.key, 'Key copied');
+        form.querySelector('#aiKl').onclick = () => copyText(withKey, 'Link with key copied');
+        form.querySelector('#aiDone').onclick = () => assistantsSheet();
+      });
+  });
 }
 async function signInSheet() {
   let a; try { a = await call('/api/account'); } catch (e) { return toast(e.message, false); }
@@ -1653,7 +1685,7 @@ document.addEventListener('click', e => {
   if (d.unlink) { const it = VIEW.items.find(i => i.id === d.unlink); return sheet(`<h3>Disconnect ${esc(it.inst)}?</h3><p style="margin:-6px 0 0">Its accounts and transactions are removed from Budget it, and the connection is deleted at Plaid. Your budgets and rules stay.</p>${VIEW.plaid.limit ? `<p class="note">This doesn’t give the connection back. Plaid’s free plan allows ${VIEW.plaid.limit} and ${VIEW.plaid.used} ${VIEW.plaid.used === 1 ? 'is' : 'are'} used, so adding this bank again later uses another one. If it only stopped updating, close this and use Reconnect instead.</p>` : ''}<div class="btns"><button class="btn primary" type="button" id="ok">Disconnect</button><button class="btn" type="button" data-close>Cancel</button></div>`, root => root.querySelector('#ok').onclick = () => { close(); post('/api/plaid/remove', { item: it.id }); }); }
   const bulk = args => { const ids = [...picked]; picked = new Set(); selecting = false; api('txn.bulk', { ids, ...args }); };
   ({ add: () => addSheet(), poke: () => { poke++; celebrate = null; render(); }, review, plaid, csv, rules, cats, whatsnew, settings, income, newgoal: newGoal, invite, push: pushOn,
-    safe: safeSheet, addbill: () => billForm(null), export: exportCsv, money: moneySheet, signin: signInSheet, owner: ownerSheet,
+    safe: safeSheet, addbill: () => billForm(null), export: exportCsv, money: moneySheet, signin: signInSheet, assistants: assistantsSheet, owner: ownerSheet,
     private: () => { PRIVATE = !PRIVATE; store.set('bi-private', PRIVATE); close(); render(); toast(PRIVATE ? 'Amounts are hidden. Tap the eye to show them.' : 'Amounts are showing', false); },
     splitit: () => { close(); if (LAPTOP) return splitConnect(); if (CLOUD) return toast('Sending to Split it works in the laptop app, where both apps run.', false); toast('On the laptop, connect Split it here, then use "Split it with someone" on any charge.', false); },
     select: () => { selecting = true; picked = new Set(); render(); }, selectoff: () => { selecting = false; picked = new Set(); render(); },

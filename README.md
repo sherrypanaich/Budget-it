@@ -175,11 +175,15 @@ Settings, Phone notifications. You get one when a budget reaches 80%, one if it 
 
 Budget it has a connector (`mcp.js`) so an assistant can answer questions about your money and make small changes by chat. It needs the https address from step 6. Budget it has no AI built in: nothing is sent to an AI company unless you connect an assistant yourself.
 
-Add a custom connector (remote MCP server, streamable HTTP) at `https://YOUR-ADDRESS/mcp`. It signs in with OAuth: the assistant sends you a link, and you sign in with your Budget it name and password (and your sign-in code, if you turned one on). It then acts as you.
+**The easy way:** everyone opens Settings in Budget it and taps **AI assistants**. It shows their own connector link, steps for Claude, every assistant connected as them, and buttons to make a key or disconnect one. Nobody needs the laptop for this.
+
+**Connect Claude:** in Claude, open Settings, then Connectors, tap **Add custom connector**, name it Budget it and paste `https://YOUR-ADDRESS/mcp`. Tap Connect, sign in with your Budget it name and password, and tap Allow. Then turn it on in a chat's tools menu.
+
+Other assistants: add a custom connector (remote MCP server, streamable HTTP) at `https://YOUR-ADDRESS/mcp`. It signs in with OAuth: the assistant sends you a link, and you sign in with your Budget it name and password (and your sign-in code, if you turned one on). It then acts as you.
 
 It can: show balances and net worth, find transactions (including by #tag), summarise spending for a month, report on how a month went, review a whole year, list what investment accounts hold, work out how long a card or loan takes to pay off, show what's left in each budget, say what's safe to spend until payday, list bills and subscriptions, list goals, change a category (and make a rule), add a cash purchase, set a budget, create a goal, add savings to a goal, ask the banks for new transactions, and undo its last change. It can't move money and never sees bank passwords or Plaid keys.
 
-If the assistant wants a key instead: `node server.js mcp-key Sherry` prints one (a "Bearer" token). `node server.js mcp-revoke Sherry` signs out every assistant for that person.
+If the assistant wants a key instead, tap **Make a key** under AI assistants (you see it once, and can disconnect it there any time). On the laptop, `node server.js mcp-key Sherry` also prints one (a "Bearer" token). `node server.js mcp-revoke Sherry` signs out every assistant for that person.
 
 ## Send charges to Split it
 

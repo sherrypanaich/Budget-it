@@ -59,9 +59,9 @@ module.exports = function makeMcp(h) {
   };
 
   // ---------- keys and tokens ----------
-  function issue(uid, client, kind, days) {
+  function issue(uid, client, kind, days, more = {}) {
     const t = (kind === 'key' ? 'bik_' : '') + rand();
-    store.tokens[sha(t)] = { uid, client, kind, at: Date.now(), exp: days ? Date.now() + days * 864e5 : null };
+    store.tokens[sha(t)] = { uid, client, kind, at: Date.now(), exp: days ? Date.now() + days * 864e5 : null, ...more };
     return t;
   }
   function whoIs(req, url) {
@@ -69,11 +69,45 @@ module.exports = function makeMcp(h) {
     const t = m ? m[1] : url.searchParams.get('key');
     const rec = t && store.tokens[sha(t)];
     if (!rec || rec.kind === 'refresh' || (rec.exp && rec.exp < Date.now()) || !h.users().users[rec.uid]) return null;
+    if (Date.now() - (rec.used || 0) > 3600e3) { rec.used = Date.now(); saveStore(); }   // "last used", at most once an hour
     return rec.uid;
   }
   // How many assistants act as this person, and a way to sign them all out (used by the owner's admin page).
   const connected = uid => { fresh(); return Object.values(store.tokens).filter(t => t.uid === uid && t.kind !== 'refresh').length; };
   const revoke = uid => { fresh(); let n = 0; for (const [k, t] of Object.entries(store.tokens)) if (t.uid === uid) { delete store.tokens[k]; n++; } if (n) saveStore(); return n; };
+  // ---------- each person's own assistants (the "AI assistants" part of the app's settings) ----------
+  // One row per assistant that signed in (Claude, Muse...) and one per key. Ids never reveal a token.
+  function mine(uid) {
+    fresh();
+    const rows = {}, now = Date.now();
+    for (const [k, t] of Object.entries(store.tokens)) {
+      if (t.uid !== uid || (t.exp && t.exp < now)) continue;
+      const key = t.kind === 'key', id = key ? 'k_' + k.slice(0, 16) : 'a_' + sha(t.client).slice(0, 16);
+      const r = rows[id] = rows[id] || { id, kind: key ? 'key' : 'app', name: key ? (t.label || 'Key made on the laptop') : (store.clients[t.client]?.name || 'An assistant'), since: t.since || t.at, used: 0 };
+      r.since = Math.min(r.since, t.since || t.at); r.used = Math.max(r.used, t.used || 0);
+    }
+    return Object.values(rows).sort((a, b) => Math.max(b.used, b.since) - Math.max(a.used, a.since));
+  }
+  function makeKey(uid, label) {
+    fresh();
+    const name = String(label || '').trim().replace(/\s+/g, ' ').slice(0, 40) || 'My assistant';
+    if (Object.values(store.tokens).filter(t => t.uid === uid && t.kind === 'key').length >= 10) throw new Error('You already have 10 keys. Remove one you don’t use first.');
+    const k = issue(uid, 'key', 'key', 0, { label: name }); saveStore();
+    return k;
+  }
+  // Disconnect one row from mine(), or every assistant when id is 'all'. Only ever touches this person's tokens.
+  function removeMine(uid, id) {
+    fresh();
+    let n = 0;
+    for (const [k, t] of Object.entries(store.tokens)) {
+      if (t.uid !== uid) continue;
+      const tid = t.kind === 'key' ? 'k_' + k.slice(0, 16) : 'a_' + sha(t.client).slice(0, 16);
+      if (id === 'all' || tid === id) { delete store.tokens[k]; n++; }
+    }
+    if (n) saveStore();
+    return n;
+  }
+
   function cli(cmd, name) {
     if (cmd !== 'mcp-key' && cmd !== 'mcp-revoke') return false;
     fresh();
@@ -167,7 +201,7 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
       if (basic) { const [i, s] = Buffer.from(basic[1], 'base64').toString().split(':').map(decodeURIComponent); m.client_id = m.client_id || i; m.client_secret = m.client_secret || s; }
       const c = store.clients[m.client_id];
       if (!c || (c.secret && sha(m.client_secret || '') !== c.secret)) return json(res, 401, { error: 'invalid_client' });
-      let uid;
+      let uid, since = Date.now();
       if (m.grant_type === 'authorization_code') {
         const k = sha(m.code || ''), rec = store.codes[k];
         delete store.codes[k];
@@ -180,11 +214,11 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
         const k = sha(m.refresh_token || ''), rec = store.tokens[k];
         if (!rec || rec.kind !== 'refresh' || rec.client !== m.client_id || rec.exp < Date.now()) return json(res, 400, { error: 'invalid_grant' });
         delete store.tokens[k];
-        uid = rec.uid;
+        uid = rec.uid; since = rec.since || rec.at;
       } else return json(res, 400, { error: 'unsupported_grant_type' });
       if (!h.users().users[uid]) return json(res, 400, { error: 'invalid_grant' });
       tidy();
-      const access = issue(uid, m.client_id, 'access', ACCESS_DAYS), refresh = issue(uid, m.client_id, 'refresh', REFRESH_DAYS);
+      const access = issue(uid, m.client_id, 'access', ACCESS_DAYS, { since }), refresh = issue(uid, m.client_id, 'refresh', REFRESH_DAYS, { since });
       saveStore();
       return json(res, 200, { access_token: access, token_type: 'Bearer', expires_in: ACCESS_DAYS * 86400, refresh_token: refresh, scope: 'budget-it' });
     }
@@ -422,7 +456,7 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
   }
 
   return {
-    cli, connected, revoke,
+    cli, connected, revoke, mine, makeKey, removeMine, address: req => base(req) + '/mcp',
     // Returns true when it handled the request.
     async handle(req, res) {
       const url = new URL(req.url, 'http://x'), p = url.pathname;
