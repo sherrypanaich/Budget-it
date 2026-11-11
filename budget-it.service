@@ -1,0 +1,15 @@
+[Unit]
+Description=Budget it
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Expects the app in ~/budget-it. Change both paths below if you put it elsewhere.
+WorkingDirectory=%h/budget-it
+ExecStart=/usr/bin/env node %h/budget-it/server.js
+Environment=PORT=8090
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

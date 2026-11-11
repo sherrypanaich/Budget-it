@@ -1,0 +1,7 @@
+data
+node_modules
+*.tar.gz
+*.zip
+budget-it.env
+docs
+.github

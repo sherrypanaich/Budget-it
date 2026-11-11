@@ -1,0 +1,4 @@
+data/
+budget-it.env
+*.log
+*.zip

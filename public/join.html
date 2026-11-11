@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Join Budget it</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F5F1E8;--surface:#fff;--ink:#14112A;--edge:#14112A;--pop:#14112A;--muted:#5D5870;--hl:#FFD23F;--owe:#E0243C;--dot:rgba(20,17,42,.07)}
+@media (prefers-color-scheme:dark){:root{--bg:#121019;--surface:#1D1A2A;--ink:#F1EEFF;--edge:#9C94C8;--pop:#5B5391;--muted:#ADA7C6;--owe:#FF6B7D;--dot:rgba(241,238,255,.10)}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:16px;background:var(--bg);color:var(--ink);
+  background-image:radial-gradient(var(--dot) 1.1px,transparent 1.3px);background-size:12px 12px;
+  font-family:"Bricolage Grotesque",system-ui,sans-serif}
+main{width:100%;max-width:360px}
+form{width:100%;max-width:360px;background:var(--surface);border:2.5px solid var(--edge);border-radius:14px;box-shadow:5px 5px 0 var(--pop);padding:22px}
+h1{font-family:"Dela Gothic One",sans-serif;font-weight:400;margin:0 0 4px;font-size:1.8rem}
+p{margin:0 0 16px;color:var(--muted)}
+label{display:block;font-weight:600;font-size:.88rem;color:var(--muted);margin:12px 0 6px}
+input{width:100%;font:inherit;font-size:1rem;padding:12px 14px;border:2.5px solid var(--edge);border-radius:12px;background:var(--surface);color:var(--ink)}
+button,.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;padding:13px;border:2.5px solid var(--edge);border-radius:12px;background:var(--hl);color:#14112A;box-shadow:3px 3px 0 var(--pop);cursor:pointer;text-decoration:none}
+.btn.alt{background:var(--surface);color:var(--ink)}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.85rem;margin:18px 0 0}.or::before,.or::after{content:"";flex:1;height:1.5px;background:var(--edge);opacity:.35}
+button:disabled{opacity:.6;cursor:default}
+.err{color:var(--owe);margin:12px 0 0;min-height:1.2em}
+.by{margin:-8px 0 14px;font-weight:700;font-size:.8rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.hint{font-size:.82rem;margin:6px 0 0}
+a{color:var(--ink)}
+.cast{display:flex;justify-content:center;gap:8px;align-items:flex-end;margin:-54px 0 6px;pointer-events:none}.cast img{height:96px;width:auto;filter:drop-shadow(3px 4px 0 rgba(20,17,42,.25))}.cast img.b{height:104px}
+@media (max-height:640px){.cast{display:none}}
+</style>
+</head>
+<body>
+<main>
+<form id="f">
+  <div class="cast" aria-hidden="true"><img src="/art/luffy-happy.webp" alt=""><img class="b" src="/art/hancock-calm.webp" alt=""></div>
+  <h1>Budget it</h1>
+  <p class="by">Your money, on your laptop</p>
+  <p id="lead">Checking your invite…</p>
+  <div id="fields" hidden>
+    <label for="n">Your name</label><input id="n" autocomplete="username" maxlength="30" required>
+    <p class="hint">This is what your friends see, and what you sign in with.</p>
+    <label for="pw">Pick a password</label><input id="pw" type="password" autocomplete="new-password" minlength="8" required>
+    <p class="hint">At least 8 characters.</p>
+    <button id="go">Join</button>
+    <div id="gBox" hidden><div class="or">or</div><a class="btn alt" id="gJoin" href="#">Join with Google</a></div>
+  </div>
+  <p class="err" id="err" role="alert"></p>
+</form>
+</main>
+<script>
+const token = new URLSearchParams(location.hash.slice(1)).get('t') || '';
+history.replaceState(null, '', '/join');   // keep the link out of the address bar and history
+const lead = document.getElementById('lead'), err = document.getElementById('err'), fields = document.getElementById('fields');
+const post = body => fetch('/api/join', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ token, ...body }) });
+(async () => {
+  if (!token) { lead.innerHTML = 'This link is missing its invite code. Ask your friend to send it again, or <a href="/login">sign in</a>.'; return; }
+  const r = await post({}).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if (!r || !r.ok) { lead.innerHTML = (d.error || 'Couldn’t check this invite.') + ' Already have an account? <a href="/login">Sign in</a>.'; return; }
+  lead.textContent = `${d.from} invited you to Budget it. Pick a name and password to join. Your budget and banks stay private to you.`;
+  fields.hidden = false; document.getElementById('n').focus();
+  if (d.google) { document.getElementById('gBox').hidden = false; document.getElementById('gJoin').href = '/auth/google?mode=join&invite=' + encodeURIComponent(token); }
+})();
+document.getElementById('f').onsubmit = async e => {
+  e.preventDefault();
+  const b = document.getElementById('go'); err.textContent = ''; b.disabled = true;
+  const r = await post({ name: n.value, password: pw.value }).catch(() => null);
+  if (r && r.ok) { location.href = '/'; return; }
+  err.textContent = r ? ((await r.json().catch(() => ({}))).error || 'Couldn’t join.') : 'Couldn’t reach Budget it. Check your connection.';
+  b.disabled = false;
+};
+</script>
+</body>
+</html>

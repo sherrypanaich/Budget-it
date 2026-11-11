@@ -1,0 +1,31 @@
+name: Release
+# Push a tag like v1.0.0, or run it from the Actions tab with a version, and this
+# publishes a GitHub Release (and the tag, if it doesn't exist yet) whose notes are
+# that version's section of CHANGELOG.md.
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, like v1.0.0'
+        required: true
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pull this version's notes out of CHANGELOG.md
+        run: |
+          awk -v v="## ${VERSION} " 'index($0, v) == 1 {on=1; next} /^## v/ {if (on) exit} on' CHANGELOG.md > notes.md
+          test -s notes.md || { echo "No section for ${VERSION} in CHANGELOG.md"; exit 1; }
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Budget it ${VERSION}: $(grep -m1 -o '^\*\*[^*]*\*\*' notes.md | tr -d '*' | sed 's/\.$//')"
+          gh release create "${VERSION}" --title "$title" --notes-file notes.md --target "$GITHUB_SHA"

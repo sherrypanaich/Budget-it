@@ -1,0 +1,24 @@
+# docker compose up -d
+# Then: docker compose exec budget-it node server.js add-user YOURNAME
+services:
+  budget-it:
+    build: .
+    container_name: budget-it
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    volumes:
+      - budget-it-data:/data
+      # A second place for backups (a USB drive or a synced folder on this computer). Uncomment this line,
+      # and set BACKUP_COPY_DIR=/backup-copy and BACKUP_PASSPHRASE in budget-it.env.
+      # The folder has to be writable by user 1000 (the "node" user inside the container).
+      # - /path/on/this/computer:/backup-copy
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    # Put your Plaid keys and other settings in budget-it.env next to this file (see budget-it.env.example)
+    env_file:
+      - path: budget-it.env
+        required: false
+volumes:
+  budget-it-data:
