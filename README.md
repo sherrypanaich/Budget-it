@@ -245,6 +245,8 @@ It can: show balances and net worth, find transactions (including by #tag), summ
 
 If the assistant wants a key instead, tap **Make a key** under AI assistants (you see it once, and can disconnect it there any time). On the laptop, `node server.js mcp-key Sherry` also prints one (a "Bearer" token). Send it in the `Authorization: Bearer KEY` header. Only if the assistant has no place for a key, put it in the link as `https://YOUR-ADDRESS/mcp?key=KEY`, as a last resort: links get saved in histories and logs, so keep that link private. `node server.js mcp-revoke Sherry` signs out every assistant for that person.
 
+**Find it in the MCP registry:** the app is listed in the official [MCP registry](https://registry.modelcontextprotocol.io) as `io.github.sherrypanaich/budget-it` (see `server.json`). Assistants that read the registry ask for your address and connect to `https://YOUR-ADDRESS/mcp`. To update the listing after a release, bump `version` in `server.json` and run **List in the MCP registry** from the Actions tab.
+
 ## Send charges to Split it
 
 If you also run [Split it](https://github.com/sherrypanaich/split-it), Budget it can add a charge there as a shared expense.
