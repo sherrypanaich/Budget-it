@@ -132,7 +132,7 @@ test('the same purchase twice in a row is added once', async () => {
   assert.ok(!x.isError, x.content[0].text);
   assert.match(x.content[0].text, /Added "Corner  Store": 7\.25 CAD on \d{4}-\d\d-\d\d, in Groceries/, 'it says the currency');
   x = await tool(key, 'add_cash_purchase', { ...buy, what: 'corner store' });
-  assert.match(x.content[0].text, /^Already added a moment ago: "corner store", 7\.25 CAD on .*\. Nothing new was added\.$/);
+  assert.match(x.content[0].text, /^Already added a moment ago: "corner store", 7\.25 CAD on .*\. Nothing new was added\. If the person really means a second one, call it again with again: true\.$/);
   const mine = async () => (await call('GET', '/api/state', undefined, sherry)).body.state.txns.filter(t => /corner\s+store/i.test(t.m));
   assert.equal((await mine()).length, 1);
   // a different amount is a different purchase

@@ -25,6 +25,8 @@ input{width:100%;font:inherit;font-size:1rem;padding:12px 14px;border:2.5px soli
 input:focus{outline:3px solid var(--hl);outline-offset:1px}
 button,.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;padding:13px;border:2.5px solid var(--edge);border-radius:12px;background:var(--hl);color:#14112A;box-shadow:3px 3px 0 var(--pop);cursor:pointer;text-decoration:none}
 button:disabled{opacity:.6;cursor:default}
+button:focus-visible,a:focus-visible{outline:3px solid #2a78d6;outline-offset:2px}
+@media (prefers-color-scheme:dark){button:focus-visible,a:focus-visible{outline-color:#6fa8ef}}
 .btn.alt,button.alt{background:var(--surface);color:var(--ink)}
 .or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.85rem;margin:18px 0 0}.or::before,.or::after{content:"";flex:1;height:1.5px;background:var(--edge);opacity:.35}
 .links{display:flex;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap}

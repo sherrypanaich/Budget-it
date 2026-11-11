@@ -4,6 +4,16 @@
 // Split it and Budget it share this file word for word (Budget it's tests check it), so a fix made
 // for one reaches the other. Anything that differs between them comes in through `h`.
 //
+// What it gives the app (module.exports):
+//   accounts(h) -> handle(req, res, url, uid): answers the routes below and returns true, or false when they aren't its.
+//     h: users() (the users.json object), saveUsers, docs() (the records), saveDb, broadcast, hashPw, findUser,
+//     setCookie, cookies, clientIp, misses, tooManyTries, nameFor, readBody, send, file, secure, SESSION_DAYS, endSessions;
+//     optional: appName, envFile, cookieName, tagline, noteMiss, slowDown, notify, inviteInfo, onJoin, cancelClaim.
+//   handle also has: base(req) (the app's address), resetLink(req, uid), needsCode(uid), checkCode(uid, code),
+//     codeTicket(uid), codeOff(uid), totp(secret, step), startSession(req, res, uid), uniqueTag(name, but), ensureTags().
+//   Session helpers, also on module.exports: sessionKey(token) (the sha256 kept in users.json), sessionGet(store, token),
+//     sessionPut(store, token, rec), sessionDrop(store, token), migrateSessions(store), slideSession(rec, days, at).
+//
 // It stays private: nobody can sign up on their own. A new account needs an
 // invite link from someone already in. Google and email only sign in people
 // who already have an account (or who hold an invite).
@@ -196,9 +206,15 @@ module.exports = function accounts(h) {
     if (ps.length) { saveDb(); broadcast(ps); }
   }
   const lookups = new Map();   // uid -> recent lookups, so nobody can walk through every tag
-  const tooManyLookups = uid => { const l = (lookups.get(uid) || []).filter(t => now() - t < 10 * 60e3); l.push(now()); lookups.set(uid, l); return l.length > 30; };
+  const tooManyLookups = uid => { const l = (lookups.get(uid) || []).filter(t => now() - t < 10 * 60e3); const over = l.length >= 30; if (!over) l.push(now()); lookups.set(uid, l); return over; };   // only tries under the limit count, so the list can't grow
   const card = id => ({ uid: id, name: nameFor(id), tag: U().users[id]?.tag || null });
   const tell = (uids, msg) => { if (h.notify) Promise.resolve(h.notify(uids, msg)).catch(() => {}); };
+  // One friend notification per pair an hour: asking, taking it back and asking again doesn't buzz their phone each time.
+  const told = new Map();   // "from>to" -> when they were last told
+  const tellOnce = (from, to, msg) => { const k = from + '>' + to, t = told.get(k);
+    if (t && now() - t < 3600e3) return;
+    told.set(k, now()); if (told.size > 5000) for (const [x, at] of told) if (now() - at >= 3600e3) told.delete(x);
+    tell([to], msg); };
 
   // ---------- Google ----------
   const gStates = new Map();   // state -> { mode, uid, invite, exp }
@@ -408,7 +424,7 @@ module.exports = function accounts(h) {
     }
     if (p === '/api/friends/request' && m === 'POST') {
       const to = String((await readBody(req)).to || '');
-      if (!U().users[to] || to === uid) return send(res, 400, { error: 'Pick someone else.' }), true;
+      if (!Object.hasOwn(U().users, to) || to === uid) return send(res, 400, { error: 'Pick someone else.' }), true;
       if (areFriends(uid, to)) return send(res, 200, { ok: true, friends: true }), true;
       U().friendReqs = U().friendReqs || {};
       const back = Object.entries(U().friendReqs).find(([, r]) => r.from === to && r.to === uid);
@@ -416,7 +432,7 @@ module.exports = function accounts(h) {
       if (Object.values(U().friendReqs).some(r => r.from === uid && r.to === to)) return send(res, 200, { ok: true, asked: true }), true;
       if (Object.values(U().friendReqs).filter(r => r.from === uid).length >= 30) return send(res, 429, { error: 'You have 30 requests waiting. Wait for some answers first.' }), true;
       U().friendReqs[rand(9)] = { from: uid, to, at: now() }; saveUsers();
-      tell([to], { title: `${nameFor(uid)} wants to be friends`, body: `@${me.tag} on ${APP}. Open it to accept.`, tag: 'friend-' + uid });
+      tellOnce(uid, to, { title: `${nameFor(uid)} wants to be friends`, body: `@${me.tag} on ${APP}. Open it to accept.`, tag: 'friend-' + uid });
       return send(res, 200, { ok: true, asked: true }), true;
     }
     if (p === '/api/friends/answer' && m === 'POST') {
@@ -437,8 +453,9 @@ module.exports = function accounts(h) {
       const hit = t && Object.entries(U().users).find(([, u]) => u.friendToken && u.friendToken.length === t.length && same(u.friendToken, t));
       if (!hit) { miss(req); return send(res, 404, { error: 'That friend link was changed or doesn’t exist.' }), true; }
       if (hit[0] === uid) return send(res, 400, { error: 'That’s your own friend link.' }), true;
+      const already = areFriends(uid, hit[0]);
       makeFriends(uid, hit[0]);
-      tell([hit[0]], { title: `${nameFor(uid)} added you`, body: `They used your friend link. You’re friends on ${APP} now.`, tag: 'friend-' + uid });
+      if (!already) tellOnce(uid, hit[0], { title: `${nameFor(uid)} added you`, body: `They used your friend link. You’re friends on ${APP} now.`, tag: 'friend-' + uid });
       return send(res, 200, { ok: true, ...card(hit[0]) }), true;
     }
     if (p === '/api/account' && m === 'GET') {

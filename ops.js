@@ -4,7 +4,8 @@
 (function (root) {
   'use strict';
   function makeOps(B, { today, rid, sample }) {
-    const num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(/[$,\s]/g, '')); return isFinite(n) ? B.round2(n) : NaN; };
+    // A billion or more is a typo (or "1e300"), not an amount: it would only turn totals into nonsense
+    const num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(/[$,\s]/g, '')); return isFinite(n) && Math.abs(n) < 1e9 ? B.round2(n) : NaN; };
     const text = (v, max = 80) => String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
       const okCat = c => B.CAT_IDS.includes(c);
     const bad = msg => { throw Object.assign(new Error(msg), { status: 400 }); };
@@ -74,7 +75,7 @@
       'txn.add'(s, a) {
         const amt = num(a.amount); if (!(amt > 0)) bad('Enter how much you paid.');
         const c = okCat(a.c) ? a.c : B.pickCat(s, a.m, null);
-        const date = /^\d{4}-\d\d-\d\d$/.test(a.date || '') ? a.date : today();
+        const date = /^\d{4}-\d\d-\d\d$/.test(a.date || '') && B.toDate(a.date) === a.date ? a.date : today();   // never 2026-02-31
         const t = { id: rid('m'), date, acct: 'cash', m: text(a.m) || 'Cash purchase', a: -amt, c, note: text(a.note, 140), manual: true, at: Date.now(), via: a.via || 'app' };
         s.txns.push(t);
         return `Added $${amt.toFixed(2)} to ${B.catName(c)}`;
@@ -129,6 +130,7 @@
         const to = a.to && a.to !== a.id && okCat(a.to) ? a.to : 'shopping';
         let n = 0; for (const t of s.txns) if (t.c === c.id && !t.other) { t.c = to; n++; }
         s.rules.forEach(r => { if (r.cat === c.id) r.cat = to; });
+        (s.myBills || []).forEach(b => { if (b.c === c.id) b.c = to; });
         delete s.budgets[c.id]; if (s.rollover) delete s.rollover[c.id]; if (s.carry) delete s.carry[c.id];
         s.cats = s.cats.filter(x => x !== c); B.useCats(s);
         return `Removed ${c.name}.${n ? ` ${n} transaction${n === 1 ? '' : 's'} moved to ${B.catName(to)}.` : ''}`;
@@ -197,8 +199,9 @@
         if (!x.manual && !x.csv && !x.disconnected) bad('Disconnect the bank to remove this account.');
         const n = s.txns.filter(t => t.acct === x.id).length;
         for (const t of s.txns) if (t.acct === x.id) unpair(s, t);
+        // A goal that followed it keeps what it had saved, in home money like the goal (a US dollar account's balance isn't)
+        s.goals.forEach(g => { if (g.acct === x.id) { g.saved = B.goalSaved(s, g); delete g.acct; } });
         s.accounts = s.accounts.filter(y => y !== x); s.txns = s.txns.filter(t => t.acct !== x.id);
-        s.goals.forEach(g => { if (g.acct === x.id) { g.saved = Math.max(0, x.bal || 0); delete g.acct; } });
         return `Removed ${x.name}${n ? ` and its ${n} transaction${n === 1 ? '' : 's'}` : ''}`;
       },
       'account.rename'(s, a) { const x = s.accounts.find(y => y.id === a.id) || bad('That account isn’t there any more.'); const n = text(a.name, 40); if (n && n !== x.name) { x.name = n; x.renamed = true; } return 'Saved'; },
@@ -209,6 +212,10 @@
         if (a.home !== old) {   // accounts keep the money they're in: the old home's accounts now say so
           for (const x of s.accounts) if (!x.other) { const c = x.cur || old; if (c === a.home) delete x.cur; else x.cur = c; }
           s.home = a.home; s.rates = {};
+          // So do their charges: back to the money they were in, then into the new home money (1 to 1 until there's a rate,
+          // like a new account's). Cash you added and splits stay as they are, in the numbers you see.
+          const accts = new Set(s.accounts.filter(x => !x.other).map(x => x.id));
+          for (const t of s.txns) if (accts.has(t.acct) && !t.other && !t.split && !t.splitOf) B.reconvert(s, t, t.orig ? t.orig.cur : old);
         }
         return `Totals are in ${a.home} now.`;
       },
@@ -282,11 +289,15 @@
         if (!rows.length) bad('No rows found. Each row needs a date, a description and an amount.');
         let acct = s.accounts.find(x => x.id === a.acct && x.csv);
         if (!acct) { acct = { id: rid('csv'), name: text(a.name, 40) || 'Imported account', inst: 'CSV', type: 'Imported', mask: '', bal: 0, shared: false, csv: true, synced: Date.now() }; s.accounts.push(acct); }
-        const seen = new Set(s.txns.filter(t => t.acct === acct.id).map(t => t.date + '|' + (t.orig ? t.orig.a : t.a) + '|' + B.norm(t.m)));
+        // How many of each day, amount and name are here already. The same file again (or one that overlaps) adds nothing
+        // twice, while two coffees for the same amount on the same day in one file both come in. The key is kept on each
+        // charge, so renaming or splitting it later doesn't make it look new.
+        const key = (d, a, m) => d + '|' + a + '|' + B.norm(m), have = new Map(), used = new Map();
+        for (const t of s.txns) if (t.acct === acct.id && !t.splitOf) { const k = t.csvKey || key(t.date, t.orig ? t.orig.a : t.a, t.m); have.set(k, (have.get(k) || 0) + 1); }
         let n = 0;
         for (const r of rows) {
-          const k = r.date + '|' + r.a + '|' + B.norm(r.m); if (seen.has(k)) continue; seen.add(k);
-          s.txns.push(B.convertTxn(s, { id: rid('c'), date: r.date, acct: acct.id, m: r.m, a: r.a, c: B.pickCat(s, r.m, r.a > 0 ? 'income' : null), note: '', fresh: true, csv: true }, acct.cur));
+          const k = key(r.date, r.a, r.m), u = (used.get(k) || 0) + 1; used.set(k, u); if (u <= (have.get(k) || 0)) continue;
+          s.txns.push(B.convertTxn(s, { id: rid('c'), date: r.date, acct: acct.id, m: r.m, a: r.a, c: B.pickCat(s, r.m, r.a > 0 ? 'income' : null), note: '', fresh: true, csv: true, csvKey: k }, acct.cur));
           n++;
         }
         s.seenNew = 0;

@@ -320,7 +320,7 @@ test('export, receipts and Send to Split it', async () => {
     assert.equal(csv.status, 200); assert.match(csv.headers.get('content-type'), /text\/csv/);
     assert.match(await csv.text(), /^Date,Description,Amount/);
     assert.equal((await fetch(base + '/api/export.csv')).status, 401);
-    // Receipts: only the owner can see them, and removing one deletes the file
+    // Receipts: only the owner can see them, and removing one takes it off the charge
     const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
     r = await req('POST', '/api/receipt', { id: t.id, data: png });
     assert.equal(r.status, 200, JSON.stringify(r.body));
@@ -335,7 +335,7 @@ test('export, receipts and Send to Split it', async () => {
     assert.equal((await op('txn.receipt', { id: t.id, receipt: '../../etc/passwd' })).status, 400, 'the browser can’t set a receipt path');
     r = await req('POST', '/api/receipt', { id: t.id, data: '' });
     assert.equal(r.body.state.txns.find(x => x.id === t.id).receipt, undefined);
-    assert.equal(fs.existsSync(path.join(DATA, 'receipts', name)), false);
+    assert.equal(fs.existsSync(path.join(DATA, 'receipts', name)), true, 'the file stays while Undo can bring it back (edges.test.js: when it goes)');
     // Split it
     const url = `http://127.0.0.1:${fakeSplit.address().port}`;
     assert.equal((await req('POST', '/api/splitit/send', { id: t.id, group: 'House' })).status, 400, 'needs connecting first');

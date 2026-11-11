@@ -24,6 +24,7 @@ const ACCESS_DAYS = 30, REFRESH_DAYS = 90, IDLE_DAYS = 90;
 // signing in are dropped after a day, or oldest first when there are MAX_CLIENTS, and one address gets 20 an hour.
 const MAX_CLIENTS = 500, UNUSED_CLIENT_MS = 24 * 3600e3, REGISTER_PER_HOUR = 20;
 const SAME_MS = 2 * 60e3;   // the same "add" again within 2 minutes is a retry, not a second purchase
+const MAX_BATCH = 50;       // calls in one batched request, so one request can't start thousands of bank updates
 const sha = s => crypto.createHash('sha256').update(String(s)).digest('hex');
 const rand = (n = 32) => crypto.randomBytes(n).toString('base64url');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -38,7 +39,7 @@ module.exports = function makeMcp(h) {
     if (m !== loadedAt) { try { store = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { store = {}; } loadedAt = m; }
     store.clients = store.clients || {}; store.codes = store.codes || {}; store.tokens = store.tokens || {}; store.forms = store.forms || {};
   };
-  const saveStore = () => { const t = FILE + '.tmp'; fs.writeFileSync(t, JSON.stringify(store)); fs.renameSync(t, FILE); try { loadedAt = fs.statSync(FILE).mtimeMs; } catch {} };
+  const saveStore = () => { const t = FILE + '.tmp'; fs.writeFileSync(t, JSON.stringify(store), { mode: 0o600 }); fs.renameSync(t, FILE); try { loadedAt = fs.statSync(FILE).mtimeMs; } catch {} };
   fresh();
   // A key or refresh token stops working after IDLE_DAYS without use ("used" is noted at most once an hour).
   const idle = (t, now = Date.now()) => (t.kind === 'key' || t.kind === 'refresh') && now - Math.max(t.used || 0, t.at || 0) > IDLE_DAYS * 864e5;
@@ -147,7 +148,8 @@ module.exports = function makeMcp(h) {
 
   // ---------- OAuth: just enough for MCP clients ----------
   // Where the assistant may be sent back to: https, http on this computer, or an app link like myapp://
-  const okRedirect = u => { try { const x = new URL(u), s = x.protocol.slice(0, -1);
+  // (at most 2000 characters: anyone can register, and each one is kept in data/oauth.json)
+  const okRedirect = u => { if (u.length > 2000) return false; try { const x = new URL(u), s = x.protocol.slice(0, -1);
     return s === 'https' || (s === 'http' && ['localhost', '127.0.0.1', '[::1]'].includes(x.hostname)) || !['http', 'javascript', 'data', 'file', 'vbscript', 'blob'].includes(s); } catch { return false; } };
   const page = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'X-Content-Type-Options': 'nosniff' }); res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Budget it</title><style>
 :root{--bg:#F5F1E8;--surface:#fff;--ink:#14112A;--muted:#5D5870;--hl:#FFD23F;--owe:#E0243C}
@@ -175,6 +177,9 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
     if (who) {
       const form = rand();
       tidy();
+      // the newest 20 per person, so opening the page over and over can't keep growing data/oauth.json
+      const theirs = Object.entries(store.forms).filter(([, f]) => f.uid === who.uid).sort((a, b) => a[1].exp - b[1].exp);
+      for (const [k] of theirs.slice(0, Math.max(0, theirs.length - 19))) delete store.forms[k];
       store.forms[sha(form)] = { uid: who.uid, client: q.client_id, redirect_uri: q.redirect_uri, challenge: q.code_challenge, exp: Date.now() + 15 * 60e3 };
       saveStore();
       const other = new URLSearchParams([...PASS_ON.filter(k => q[k]).map(k => [k, q[k]]), ['other', '1']]);
@@ -201,7 +206,7 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
   // How many apps each address registered in the last hour (kept in memory; a restart forgets it, which is fine)
   const regs = new Map();
   const tooManyRegs = req => {
-    const ip = (h.clientIp ? h.clientIp(req) : req.socket.remoteAddress) || '?', now = Date.now();
+    const ip = (h.clientKey ? h.clientKey(req) : h.clientIp ? h.clientIp(req) : req.socket.remoteAddress) || '?', now = Date.now();   // an IPv6 /64 counts as one address
     const list = (regs.get(ip) || []).filter(t => now - t < 3600e3);
     if (list.length >= REGISTER_PER_HOUR) { regs.set(ip, list); return true; }
     list.push(now); regs.set(ip, list);
@@ -245,12 +250,15 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
     }
     if (p === '/oauth/authorize') {
       const q = req.method === 'POST' ? await readForm(req) : Object.fromEntries(url.searchParams);
-      const c = store.clients[q.client_id];
+      const c = Object.hasOwn(store.clients, q.client_id || '') ? store.clients[q.client_id] : null;
       if (!c) return page(res, 400, `<div class="box"><h1>Unknown app</h1><p>Try connecting Budget it from your assistant again.</p></div>`);
       if (!c.redirect_uris.includes(q.redirect_uri)) return page(res, 400, `<div class="box"><h1>That link doesn’t match</h1><p>Try connecting again from your assistant.</p></div>`);
       const back = params => { const u = new URL(q.redirect_uri); for (const [k, v] of Object.entries(params)) if (v) u.searchParams.set(k, v); res.writeHead(302, { Location: u.toString(), 'Cache-Control': 'no-store' }); res.end(); };
-      if (req.method === 'GET' && q.response_type !== 'code') return back({ error: 'unsupported_response_type', state: q.state });
-      if (!q.code_challenge || (q.code_challenge_method || 'plain') !== 'S256') return back({ error: 'invalid_request', error_description: 'PKCE S256 required', state: q.state });
+      // A request that isn't right is answered here, never by sending the browser on: anyone can register an app with
+      // any https return address, so that would let a link to this site land people on any page.
+      const wrong = why => page(res, 400, `<div class="box"><h1>That assistant asked in a way Budget it doesn’t allow</h1><p>${why} Try connecting again from your assistant, or check it’s up to date.</p></div>`);
+      if (q.response_type !== 'code') return wrong('It has to ask for a sign-in code.');
+      if (!q.code_challenge || (q.code_challenge_method || 'plain') !== 'S256') return wrong('It has to use PKCE (S256).');
       // Who is signed in to Budget it in this browser, for the one-tap Allow ("Use a different account" skips it)
       const sid = h.sessionUid && h.sessionUid(req), who = sid && !q.other ? { uid: sid, name: h.users().users[sid]?.name || 'you' } : null;
       if (req.method !== 'POST') return authorizeForm(res, q, c.name, null, who);
@@ -285,8 +293,9 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
     if (p === '/oauth/token' && req.method === 'POST') {
       const m = await readForm(req);
       const basic = /^Basic\s+(\S+)/i.exec(req.headers.authorization || '');
-      if (basic) { const [i, s] = Buffer.from(basic[1], 'base64').toString().split(':').map(decodeURIComponent); m.client_id = m.client_id || i; m.client_secret = m.client_secret || s; }
-      const c = store.clients[m.client_id];
+      const dec = v => { try { return decodeURIComponent(v ?? ''); } catch { return ''; } };   // a broken one is just a wrong secret
+      if (basic) { const [i, s] = Buffer.from(basic[1], 'base64').toString().split(':').map(dec); m.client_id = m.client_id || i; m.client_secret = m.client_secret || s; }
+      const c = Object.hasOwn(store.clients, String(m.client_id || '')) ? store.clients[m.client_id] : null;
       if (!c || (c.secret && sha(m.client_secret || '') !== c.secret)) return json(res, 401, { error: 'invalid_client' });
       let uid, ro = false, since = Date.now();
       if (m.grant_type === 'authorization_code') {
@@ -527,6 +536,7 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
     create_goal: (a, s) => ({ key: [norm(a.name), B.round2(+a.target), a.by || ''], what: `the goal ${said(String(a.name ?? '').trim())}, ${money(a.target, s)}` }),
     add_to_goal: (a, s) => ({ key: [norm(a.goal), B.round2(+a.amount)], what: `${money(a.amount, s)} to ${said(String(a.goal ?? '').trim())}` })
   };
+  for (const t of tools) if (SAME[t.name]) t.inputSchema.properties.again = { type: 'boolean', description: 'Only when the person says this really is a second one, the same as one just added.' };
   const added = new Map();   // hash of person, tool and arguments -> { uid, at }
   const forget = uid => { for (const [k, v] of added) if (v.uid === uid) added.delete(k); };   // after an undo, adding it again is meant
 
@@ -555,7 +565,7 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
       try { const s = h.stateOf(uid);   // switches to this person's own categories
         const args = params.arguments && typeof params.arguments === 'object' && !Array.isArray(params.arguments) ? params.arguments : {};
         const same = SAME[t.name] && SAME[t.name](args, s), k = same && sha(JSON.stringify([uid, t.name, same.key])), was = k && added.get(k);
-        if (was && Date.now() - was.at < SAME_MS) return ok({ content: [{ type: 'text', text: `Already added a moment ago: ${same.what}. Nothing new was added.` }] });
+        if (was && Date.now() - was.at < SAME_MS && args.again !== true) return ok({ content: [{ type: 'text', text: `Already added a moment ago: ${same.what}. Nothing new was added. If the person really means a second one, call it again with again: true.` }] });
         const out = t.run(uid, args);   // noted before waiting, so the same call twice in one batch adds once
         if (k) { for (const [x, v] of added) if (Date.now() - v.at >= SAME_MS) added.delete(x); added.set(k, { uid, at: Date.now() }); }
         return ok({ content: [{ type: 'text', text: await out }] }); }
@@ -573,6 +583,7 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
     if (req.method !== 'POST') return json(res, 405, { error: 'POST only' }, { Allow: 'POST' });
     let body;
     try { body = JSON.parse(await readText(req)); } catch { return json(res, 400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }); }
+    if (Array.isArray(body) && body.length > MAX_BATCH) return json(res, 200, { jsonrpc: '2.0', id: null, error: { code: -32600, message: `Too many calls in one batch (${MAX_BATCH} at most). Send them in smaller groups.` } });
     const out = Array.isArray(body) ? (await Promise.all(body.map(m => rpc(uid, m, !!who.ro)))).filter(Boolean) : await rpc(uid, body, !!who.ro);
     if (!out || (Array.isArray(out) && !out.length)) return json(res, 202);
     return json(res, 200, out);

@@ -74,6 +74,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 /* quick add */
 .quick{margin-top:14px;background:var(--surface);border:2.5px solid var(--edge);border-radius:14px;box-shadow:4px 4px 0 var(--pop);padding:5px 5px 5px 14px;display:flex;align-items:center;gap:6px}
 .quick input{flex:1;border:0;background:none;padding:10px 0;font-size:1rem;min-width:0;outline:none}
+.quick:has(input:focus-visible),.search:has(input:focus-visible),.amtin:has(input:focus-visible){outline:3px solid var(--c1);outline-offset:2px}
 .qbtn{border:2px solid var(--edge);border-radius:13px;height:40px;width:40px;flex:none;display:grid;place-items:center;background:color-mix(in srgb,var(--hl) 30%,var(--surface));color:var(--ink)}
 .qbtn svg{width:22px;height:22px}
 .qbtn.go{background:var(--hl);color:var(--hl-ink)}
@@ -130,6 +131,7 @@ button.row:active{background:var(--surface2)}
 .btn.primary{background:var(--hl);color:var(--hl-ink)}
 .btn.sm{padding:6px 12px;font-size:.86rem;border-width:2px;box-shadow:2px 2px 0 var(--pop)}
 .btn.block{display:block;width:100%;padding:13px}
+a.btn{text-decoration:none;text-align:center}
 .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
 .sheet .btns{margin-top:0}
 .btns .btn{flex:1}
@@ -166,7 +168,7 @@ button.row:active{background:var(--surface2)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .legend i{width:16px;height:0;border-top:3px solid;display:inline-block}
 /* search + chips */
-.search{display:flex;align-items:center;gap:8px;background:var(--surface);border:2.5px solid var(--edge);border-radius:14px;box-shadow:3px 3px 0 var(--pop);padding:0 12px;margin-top:16px}
+.search{display:flex;align-items:center;gap:8px;min-width:0;background:var(--surface);border:2.5px solid var(--edge);border-radius:14px;box-shadow:3px 3px 0 var(--pop);padding:0 12px;margin-top:16px}
 .search input{flex:1;border:0;background:none;padding:12px 0;outline:none;min-width:0}
 .chips{display:flex;gap:8px;overflow-x:auto;padding:12px 2px 8px;scrollbar-width:none}
 .chip{border:2px solid var(--edge);border-radius:999px;padding:6px 12px;background:var(--surface);font-weight:700;font-size:.86rem;white-space:nowrap}
@@ -249,6 +251,7 @@ div.row{cursor:default}
 .toast button{background:var(--hl);color:var(--hl-ink);border:2px solid var(--edge);border-radius:10px;padding:5px 12px;font-weight:800}
 .foot{margin:34px 4px 0;text-align:center;font-size:.8rem;color:var(--muted)}
 @media (max-width:400px){.htext{width:calc(100% - 100px)}.hart{width:112px}.tile{padding:9px 9px}.poster{grid-template-columns:76px minmax(0,1fr)}.poster .t{font-size:1.4rem}}
+.row.noic{grid-template-columns:minmax(0,1fr) auto}
 .row.off{opacity:.55}.row.off .amt{text-decoration:line-through}
 .row.picked{background:color-mix(in srgb,var(--hl) 30%,var(--surface))}
 .tic.pick{border:2.5px solid var(--edge);background:var(--surface);color:var(--ink)}.row.picked .tic.pick{background:var(--hl);color:var(--hl-ink)}
@@ -292,6 +295,7 @@ nav.tabs .brand,.addlbl,nav.tabs .railonly{display:none}
   .hero:not(.plain){padding-top:70px}
   .htext{width:calc(100% - 170px)}
   .hart{width:168px}
+  .speech{right:150px}
   .hero .big{font-size:min(4rem,calc((min(100vw - 172px,860px) - 260px)/(var(--n,6)*.7)))}
   .hero.plain .big{font-size:min(4rem,calc((min(100vw - 172px,860px) - 80px)/(var(--n,6)*.7)))}
   .tiles{gap:14px}.tile{padding:14px 16px}
@@ -320,6 +324,7 @@ nav.tabs .brand,.addlbl,nav.tabs .railonly{display:none}
   .dash.page .col-side>.sec-h:first-child{margin-top:0}
   .hero{min-height:230px}
   .hart{width:190px}
+  .speech{right:172px}
   .htext{width:calc(100% - 190px)}
   .hero .big{font-size:min(4.4rem,calc((min(100vw - 348px,1180px)*.58 - 250px)/(var(--n,6)*.68)))}
   .hero.plain .big{font-size:min(4.2rem,calc((min(100vw - 348px,1180px)*.58 - 70px)/(var(--n,6)*.68)))}
@@ -343,16 +348,16 @@ const B = window.Budget;
 const ART = {}; for (const g of ['luffy', 'hancock']) { ART[g] = {}; for (const m of ['happy', 'calm', 'worried', 'celebrate']) ART[g][m] = `art/${g}-${m}.webp`; }
 const GNAME = { luffy: 'Luffy', hancock: 'Hancock' };
 const LINES = {
- luffy: { happy: ["Shishishi! You're right on track. More meat money later!", "Budget looks great, captain. Let's keep sailing!", "Nothing scary this month. I like it!"],
-  calm: ["We're spending a bit fast. Slow down a little and we're fine!", "A bit ahead of the month. Eat at home a couple of nights?"],
+ luffy: { happy: ["Shishishi! You’re right on track. More meat money later!", "Budget looks great, captain. Let’s keep sailing!", "Nothing scary this month. I like it!"],
+  calm: ["We’re spending a bit fast. Slow down a little and we’re fine!", "A bit ahead of the month. Eat at home a couple of nights?"],
   worried: c => `Uh oh! ${c} is over budget. Move some money from another one?`,
   review: n => `${n} new charge${n > 1 ? 's' : ''} came in from the bank. Check ${n > 1 ? 'them' : 'it'} with me?`,
-  empty: "Connect your bank and I'll keep an eye on the money for you!",
+  empty: "Connect your bank and I’ll keep an eye on the money for you!",
   celebrate: g => `You did it! ${g} is done! Party on the ship tonight!` },
- hancock: { happy: ["Of course you're on budget. I expected nothing less.", "Everything is in order. You may admire your spending now.", "Perfect. As perfect as I am."],
-  calm: ["You're spending a little quickly. I'll allow it, for now.", "Ahead of pace this month. Be careful, darling."],
-  worried: c => `${c} is over budget. Even I can't overlook that.`,
-  review: n => `${n} new charge${n > 1 ? 's are' : ' is'} waiting for you. Don't keep ${n > 1 ? 'them' : 'it'} waiting.`,
+ hancock: { happy: ["Of course you’re on budget. I expected nothing less.", "Everything is in order. You may admire your spending now.", "Perfect. As perfect as I am."],
+  calm: ["You’re spending a little quickly. I’ll allow it, for now.", "Ahead of pace this month. Be careful, darling."],
+  worried: c => `${c} is over budget. Even I can’t overlook that.`,
+  review: n => `${n} new charge${n > 1 ? 's are' : ' is'} waiting for you. Don’t keep ${n > 1 ? 'them' : 'it'} waiting.`,
   empty: 'Connect a bank. I refuse to guess where your money goes.',
   celebrate: g => `${g} is complete! Naturally. Beauty and discipline go together.` } };
 const COLOR = { groceries: '--c3', dining: '--c2', transport: '--c1', home: '--c6', shopping: '--c5', fun: '--c4', health: '--c7', income: '--c3', transfer: '--c8' };
@@ -649,7 +654,7 @@ const months = () => { const first = S.txns.reduce((m, t) => t.date < m ? t.date
 function mood() {
   const g = S.guide === 'hancock' ? 'hancock' : 'luffy', L = LINES[g], pick = a => a[(+TODAY.slice(8) + poke) % a.length];
   if (celebrate) return { m: 'celebrate', line: L.celebrate(celebrate) };
-  if (!hasData()) return { m: 'happy', line: CLOUD ? (g === 'hancock' ? 'Add your accounts. I refuse to guess where your money goes.' : "Add your accounts and I'll keep an eye on the money for you!") : L.empty };
+  if (!hasData()) return { m: 'happy', line: CLOUD ? (g === 'hancock' ? 'Add your accounts. I refuse to guess where your money goes.' : "Add your accounts and I’ll keep an eye on the money for you!") : L.empty };
   const over = B.budgeted(S).filter(c => B.budgetState(S, c, CUR) === 'over' && c !== 'home');
   if (over.length) return { m: 'worried', line: L.worried(B.catName(over[0])) };
   const nf = fresh().length;
@@ -698,7 +703,7 @@ function home() {
       <p class="hline">${hasData() ? 'Set budgets to see what’s left to spend.' : (CLOUD ? 'Add an account or import a CSV to get started.' : 'Connect a bank or import a CSV to get started.')}</p></div>${guide}</section>`;
   const quick = `<form class="quick" id="quick" autocomplete="off"><input id="qa" placeholder="coffee 4.50" aria-label="Quick add a cash purchase">
     <button class="qbtn go" type="submit" aria-label="Add">${svg('spark', '')}</button></form>
-    <p class="qhint">Paid cash? Type it like "lunch 14.20". Card and bank charges come in by themselves.</p>`;
+    <p class="qhint">Paid cash? Type it like “lunch 14.20”. Card and bank charges come in by themselves.</p>`;
   const byHand = CLOUD || (LAPTOP && !VIEW.plaid.configured);   // no Plaid keys on this laptop: start by hand or with a CSV
   if (!hasData()) return head + hero + quick + sec('Get started') + `<div class="card">
     <button class="needs" type="button" data-act="${byHand ? 'addacct' : 'plaid'}"><span class="n">1</span><span><b>${byHand ? 'Add an account by hand' : 'Connect your bank'}</b><small>${byHand ? 'Chequing, savings, a card or cash, with today’s balance' : 'Balances and charges come in by themselves, read only'}</small></span>${chev}</button>
@@ -726,7 +731,7 @@ function home() {
   const upH = up.length ? sec('Coming up', '<button class="link" type="button" data-go="plans">Calendar</button>') + `<div class="card">${up.map(b => `<div class="row">${tic(b.c || 'home')}<span class="rt"><b>${esc(b.n)}</b><small>${b.varies ? 'About ' : ''}${money(b.a)} · ${esc(acct(b.acct).name)}</small></span><span class="pill${b.days <= 3 ? ' hl' : ''}">${whenLabel(b)}</span></div>`).join('')}</div>` : '';
   const posterH = top ? `<button class="poster" type="button" data-search="${esc(top.name)}"><span class="ph">${svg(top.cat, '')}</span><span><span class="stamp">BOUNTY</span><span class="t">WANTED</span><span class="who">${esc(top.name)}</span><span class="bounty num">${money(top.total)}</span><span class="p">Took the most money this month, in ${top.count} trip${top.count > 1 ? 's' : ''}. Tap to see them.</span></span></button>` : '';
   const recentH = sec('Recent', '<button class="link" type="button" data-go="activity">See all</button>') + `<div class="card">${recent.map(txnRow).join('') || '<p class="pad muted" style="margin:0">Nothing yet.</p>'}</div>`;
-  const foot = `<p class="foot">Budget it v${esc(VIEW.version)}${VIEW.demo ? ' preview · sample data' : VIEW.cloud ? ' · saved privately to your Claude account' : ''} · <button class="link" type="button" data-act="whatsnew">What's new</button></p>`;
+  const foot = `<p class="foot">Budget it v${esc(VIEW.version)}${VIEW.demo ? ' preview · sample data' : VIEW.cloud ? ' · saved privately to your Claude account' : ''} · <button class="link" type="button" data-act="whatsnew">What’s new</button></p>`;
   if (WIDE()) {
     const bs = B.budgetStatus(S, CUR, TODAY).slice(0, 6);
     const budH = bs.length ? sec('Budgets', '<button class="link" type="button" data-go="budgets">All</button>') + `<div class="card">${bs.map(budRow).join('')}</div>` : '';
@@ -762,7 +767,7 @@ function budgets() {
   <div class="card pad"><div class="row" style="padding:0;border:0">${tic('income')}<span class="rt"><b>${inc ? money(inc, { round: true }) + ' a month' : 'How much comes in?'}</b><small>${S.expectIncome ? 'Your take-home pay' : inc ? `What came in during ${monName(PREV, 1)}` : 'Add your take-home pay to plan it'}</small></span><button class="btn sm" type="button" data-act="income">Change</button></div>
   ${inc ? `<span class="bar" style="margin-top:14px;height:16px"><i style="width:${Math.min(100, planned / inc * 100)}%;background:var(--c6);border-radius:0"></i><i style="left:${Math.min(100, planned / inc * 100)}%;width:${Math.max(0, Math.min(100 - planned / inc * 100, goalsM / inc * 100))}%;background:var(--c1);border-radius:0"></i></span>
   <div class="legend" style="padding:10px 0 0"><span><i style="border-color:var(--c6)"></i>Budgets ${money(planned, { round: true })}</span><span><i style="border-color:var(--c1)"></i>Goals ${money(goalsM, { round: true })}</span><span><i style="border-color:var(--line)"></i>${free >= 0 ? 'No job yet ' + money(free, { round: true }) : 'Over by ' + money(-free, { round: true })}</span></div>
-  ${free > 0 ? `<p class="small muted" style="margin:10px 0 0">${money(free, { round: true })} a month isn't planned. Giving it to a goal gets you there sooner.</p><div class="btns"><button class="btn" type="button" data-go="plans">Pick a goal</button></div>` : free < 0 ? `<p class="small muted" style="margin:10px 0 0">Your budgets and goals add up to more than comes in. Trim a budget or push a goal back.</p>` : ''}` : ''}</div>`, true);
+  ${free > 0 ? `<p class="small muted" style="margin:10px 0 0">${money(free, { round: true })} a month isn’t planned. Giving it to a goal gets you there sooner.</p><div class="btns"><button class="btn" type="button" data-go="plans">Pick a goal</button></div>` : free < 0 ? `<p class="small muted" style="margin:10px 0 0">Your budgets and goals add up to more than comes in. Trim a budget or push a goal back.</p>` : ''}` : ''}</div>`, true);
 }
 
 /* ---------- Plans ---------- */
@@ -827,7 +832,7 @@ function activity() {
   <p class="small muted" style="margin:10px 4px 0">Home &amp; bills, income and transfers are left out so you see everyday spending.</p>` : ''}
 `;
   const mainH = `  ${nf ? `<button class="btn primary block" type="button" data-act="review" style="margin-top:16px">Check ${nf} new charge${nf > 1 ? 's' : ''}</button>` : ''}
-  <div style="display:flex;gap:10px;align-items:center"><label class="search" style="flex:1">${svg('search')}<input id="q" type="search" placeholder="Search a store, note, amount or #tag" value="${esc(q)}" aria-label="Search transactions"></label>
+  <div style="display:flex;gap:10px;align-items:center"><label class="search" style="flex:1">${svg('search')}<input id="q" type="search" placeholder="Store, amount or #tag" value="${esc(q)}" aria-label="Search transactions"></label>
   <button class="btn sm" type="button" data-act="${selecting ? 'selectoff' : 'select'}" style="margin-top:16px">${selecting ? 'Done' : 'Select'}</button></div>
   <div class="chips" role="group" aria-label="Filter by category"><button class="chip" type="button" data-f="all" aria-pressed="${filter === 'all'}">All</button>${B.CATS.map(c => `<button class="chip" type="button" data-f="${c.id}" aria-pressed="${filter === c.id}">${esc(c.name)}</button>`).join('')}</div>
   ${q && list.length ? `<p class="small muted" style="margin:0 4px 8px">${list.length} match${list.length === 1 ? '' : 'es'} in every month, ${money(-list.reduce((s, t) => s + (t.a < 0 && !t.other && !t.hidden && t.c !== 'transfer' ? t.a : 0), 0))} spent.</p>` : ''}
@@ -915,7 +920,7 @@ function worthChart(nw) {
 function trendSheet(c) {
   const ms = months().slice(-12).reverse();
   sheet(`<h3>${esc(B.catName(c))}</h3><p class="muted" style="margin:-8px 0 0">Tap a month to see its charges.</p><div class="card">${ms.map(m => { const v = B.spent(S, c, m), b = B.limit(S, c, m);
-    return `<button class="row" type="button" data-trendmonth="${m}"><span class="rt"><b>${monName(m, 1)} ${m.slice(0, 4)}</b><small>${m === CUR ? 'So far' : b ? (v <= b ? 'Under budget' : 'Over by ' + money(v - b, { round: true })) : 'No budget'}</small></span><span class="amt">${money(v)}</span></button>`; }).join('')}</div>
+    return `<button class="row noic" type="button" data-trendmonth="${m}"><span class="rt"><b>${monName(m, 1)} ${m.slice(0, 4)}</b><small>${m === CUR ? 'So far' : b ? (v <= b ? 'Under budget' : 'Over by ' + money(v - b, { round: true })) : 'No budget'}</small></span><span class="amt">${money(v)}</span></button>`; }).join('')}</div>
   <div class="btns"><button class="btn" type="button" data-close>Done</button></div>`, root => root.querySelectorAll('[data-trendmonth]').forEach(b => b.onclick = () => { close(); filter = c; q = ''; month = b.dataset.trendmonth; shown = 200; tab = 'activity'; sub = null; render(); scrollTo(0, 0); }));
 }
 
@@ -926,8 +931,8 @@ const units = q => (+q).toLocaleString('en-CA', { maximumFractionDigits: 4 });
 function holdingsCard(a) {
   if (a.type !== 'Investment') return '';
   const h = B.holdings(a), money = (v, o) => curMoney(v, a.cur, o);
-  if (!h.list.length) return a.manual ? `<div class="card pad"><b>Holdings</b><p class="small muted" style="margin:6px 0 10px">Add what you own (VFV, XEQT, a stock) and Budget it keeps this account's balance as their total.</p><button class="btn sm" type="button" id="addhold">Add a holding</button></div>`
-    : `<p class="note">Your bank hasn't shared what this account holds. Only its balance shows.</p>`;
+  if (!h.list.length) return a.manual ? `<div class="card pad"><b>Holdings</b><p class="small muted" style="margin:6px 0 10px">Add what you own (VFV, XEQT, a stock) and Budget it keeps this account’s balance as their total.</p><button class="btn sm" type="button" id="addhold">Add a holding</button></div>`
+    : `<p class="note">Your bank hasn’t shared what this account holds. Only its balance shows.</p>`;
   return `<div class="card holds"><div class="pad" style="padding-bottom:4px"><b>Holdings</b><span class="small muted"> · ${money(h.value)}${h.gain !== null ? ` · <span style="color:var(${h.gain >= 0 ? '--good' : '--bad'})">${h.gain >= 0 ? 'up' : 'down'} ${money(Math.abs(h.gain))} (${Math.abs(h.pct)}%)</span>` : ''}</span></div>
     ${h.list.map(x => `<${a.manual ? 'button type="button"' : 'div'} class="row" data-hold="${esc(x.id)}"><span class="tic rank" style="font-size:.62rem;font-family:var(--body);font-weight:800">${esc((x.sym || x.name).slice(0, 5))}</span><span class="rt"><b>${esc(x.name)}</b><small>${units(x.qty)} × ${money(x.price)}</small></span><span class="amt">${money(x.value)}${x.gain !== null ? `<small style="color:var(${x.gain >= 0 ? '--good' : '--bad'})">${x.gain >= 0 ? '+' : '−'}${Math.abs(x.pct)}%</small>` : '<small>no cost added</small>'}</span></${a.manual ? 'button' : 'div'}>`).join('')}
     ${a.manual ? `<div class="pad" style="padding-top:8px"><p class="small muted" style="margin:0 0 8px">Prices you add don’t update by themselves.${a.priced ? ' Last updated ' + ago(a.priced) + '.' : ''}</p><div class="chips" style="gap:8px"><button class="btn sm" type="button" id="prices">Update prices</button><button class="btn sm" type="button" id="addhold">Add a holding</button></div></div>` : ''}</div>`;
@@ -935,7 +940,7 @@ function holdingsCard(a) {
 // Today's price for each holding, all in one go
 function pricesSheet(acctId) {
   const a = acct(acctId), list = a.holdings || [];
-  sheet(`<h3>Update prices</h3><p class="muted" style="margin:-8px 0 0">${esc(a.name)}. Type today's price of one unit${a.cur ? ' in ' + esc(a.cur) : ''}. Your brokerage app or a search for the symbol shows it.</p>
+  sheet(`<h3>Update prices</h3><p class="muted" style="margin:-8px 0 0">${esc(a.name)}. Type today’s price of one unit${a.cur ? ' in ' + esc(a.cur) : ''}. Your brokerage app or a search for the symbol shows it.</p>
   ${list.map(h => `<label class="f">${esc(h.sym || h.name)}${h.sym && h.name !== h.sym ? ` <span class="muted small" style="font-weight:600">${esc(h.name)}</span>` : ''}<input class="inp" data-price="${esc(h.id)}" inputmode="decimal" value="${h.price}"></label>`).join('')}
   <p class="small" id="pt" aria-live="polite" style="margin:0"></p>
   <div class="btns"><button class="btn primary" type="button" id="ok">Save prices</button><button class="btn" type="button" data-close>Cancel</button></div>`, root => {
@@ -970,7 +975,7 @@ function accounts() {
   const nw = own.reduce((s, a) => s + hb(a), 0), have = own.filter(a => a.bal > 0).reduce((s, a) => s + hb(a), 0), owe = -own.filter(a => a.bal < 0).reduce((s, a) => s + hb(a), 0);
   const groups = {}; own.forEach(a => { (groups[a.type] = groups[a.type] || []).push(a); });
   const newest = Math.max(0, ...own.map(a => a.synced || 0));
-  const row = a => `<button class="row" type="button" data-acct="${esc(a.id)}">${ticK(a.bal < 0 ? 'lock' : a.csv ? 'file' : 'bank', a.bal < 0 ? '--c7' : '--c1')}<span class="rt"><b>${esc(a.name)}</b><small>${esc(a.inst)}${a.mask ? ' ···' + esc(a.mask) : ''} · ${a.disconnected ? 'Disconnected · history kept' : a.other ? 'Shared by ' + esc(a.owner) : sharedLine(a)}</small></span><span class="amt">${a.csv ? '' : curMoney(a.bal, a.cur, { abs: true })}<small>${a.csv ? 'imported' : a.cur && B.rate(S, a.cur) ? '≈ ' + money(hb(a), { abs: true, round: true }) + (a.bal < 0 ? ' owing' : '') : a.bal < 0 ? 'owing' : gainLine(a) || 'available'}</small></span></button>`;
+  const row = a => `<button class="row" type="button" data-acct="${esc(a.id)}">${ticK(a.bal < 0 ? 'lock' : a.csv ? 'file' : 'bank', a.bal < 0 ? '--c7' : '--c1')}<span class="rt"><b>${esc(a.name)}</b><small>${esc(a.inst)}${a.mask ? ' ···' + esc(a.mask) : ''} · ${a.disconnected ? 'Disconnected · history kept' : a.other ? 'Shared by ' + esc(a.owner) : sharedLine(a)}</small></span><span class="amt">${a.csv ? '' : curMoney(a.bal, a.cur, { abs: true })}<small>${a.csv ? 'imported' : a.cur && B.rate(S, a.cur) ? '≈ ' + money(hb(a), { abs: true, round: true }) + (a.bal < 0 ? ' owing' : '') : a.disconnected ? 'last known' : a.bal < 0 ? 'owing' : gainLine(a) || 'available'}</small></span></button>`;
   const page = `<header class="top"><button class="icon-btn" type="button" data-back aria-label="Back">${svg('back')}</button><h1>Accounts</h1>${VIEW.items.length ? `<button class="icon-btn" type="button" data-act="sync" aria-label="Update from banks">${svg('sync')}</button>` : ''}</header>
   <section class="hero plain"><div class="htext"><p class="lbl">Net worth</p>${bigC(nw)}<p class="hline">${money(have, { round: true })} in your accounts, ${money(owe, { round: true })} owing.${newest ? ' Updated ' + ago(newest) + '.' : ''}</p></div></section>
   ${miss.length ? `<button class="needs" type="button" data-act="money" style="margin-top:12px"><span class="n" style="background:var(--bad);color:#fff">!</span><span><b>Add a rate for ${esc(miss.join(", "))}</b><small>Until then those accounts count 1 to 1 in your net worth.</small></span>${svg('back', 'ico chev')}</button>` : ''}
@@ -978,13 +983,13 @@ function accounts() {
   ${Object.entries(groups).map(([g, as]) => sec(esc(g)) + `<div class="card">${as.map(row).join('')}</div>`).join('') || '<div style="margin-top:16px"></div>' + emptyCard('No accounts yet', 'Connect a bank to bring in balances and charges, or import a CSV.')}
   ${shared.length ? sec('Shared with you') + `<div class="card">${shared.map(row).join('')}</div>` : ''}
   <div class="btns">${CLOUD ? '' : '<button class="btn primary" type="button" data-act="plaid">Connect a bank</button>'}<button class="btn${CLOUD ? ' primary' : ''}" type="button" data-act="csv">Import a CSV</button><button class="btn" type="button" data-act="addacct">Add by hand</button></div>
-  ${VIEW.items.length ? sec('Banks') + `<div class="card">${VIEW.items.map(it => `<div class="row">${ticK('bank', it.error ? '--c7' : '--c3')}<span class="rt"><b>${esc(it.inst)}</b><small>${it.error ? (it.error === 'login' ? 'Needs you to sign in again' : esc(it.error)) + ' · ' : ''}Last updated ${ago(it.syncedAt)}</small></span>${it.error ? `<button class="btn sm" type="button" data-fix="${esc(it.id)}">Reconnect</button>` : `<button class="btn sm" type="button" data-unlink="${esc(it.id)}">Disconnect</button>`}</div>`).join('')}</div>` : ''}
+  ${VIEW.items.length ? sec('Banks') + `<div class="card">${VIEW.items.map(it => `<div class="row">${ticK('bank', it.error ? '--c7' : '--c3')}<span class="rt"><b>${esc(it.inst)}</b><small${it.error ? ' style="white-space:normal"' : ''}>${it.error ? (it.error === 'login' ? 'Needs you to sign in again' : esc(it.error)) + ' · ' : ''}Last updated ${ago(it.syncedAt)}</small></span>${it.error ? `<button class="btn sm" type="button" data-fix="${esc(it.id)}">Reconnect</button>` : `<button class="btn sm" type="button" data-unlink="${esc(it.id)}">Disconnect</button>`}</div>`).join('')}</div>` : ''}
 `;
   const side = `${worthChart(nw)}
   ${sec('Your AI assistant')}
-  <div class="card"><div class="row" style="border:0">${ticK('bot', '--c6')}<span class="rt"><b>Ask Claude or Muse</b><small style="white-space:normal">"How much did I spend on dining this month?" Add Budget it as a connector with this address:</small></span><span></span></div>
+  <div class="card"><div class="row" style="border:0">${ticK('bot', '--c6')}<span class="rt"><b>Ask Claude, Muse or ChatGPT</b><small style="white-space:normal">“How much did I spend on dining this month?” Add Budget it as a connector with this address:</small></span>${LAPTOP ? '<button class="btn sm" type="button" data-act="assistants">Set up</button>' : '<span></span>'}</div>
   <div class="pad" style="padding-top:0"><code class="inp" style="display:block;font-family:var(--mono);font-size:.85rem;overflow-wrap:anywhere;box-shadow:none">${esc(LAPTOP ? location.origin + '/mcp' : 'https://your-laptop-address/mcp')}</code></div>
-  ${[['get_balances', 'Balances and net worth'], ['list_transactions', 'Find transactions'], ['spending_summary', 'Spending by category for any month'], ['budget_status', "What's left in each budget"], ['list_goals', 'Savings goals'], ['set_category', "Change a transaction's category"], ['add_cash_purchase', 'Add something paid in cash'], ['add_to_goal', 'Record savings toward a goal'], ['safe_to_spend', 'Safe to spend until payday'], ['list_bills', 'Bills and subscriptions'], ['month_report', 'How a month went'], ['year_review', 'Your year in review'], ['payoff_plan', 'How long a card or loan takes to pay off'], ['set_budget', 'Set a budget'], ['update_price', 'Update a holding’s price'], ['create_goal', 'Create a goal'], ['refresh_banks', 'Update from banks now'], ['undo_last_change', 'Undo the last change']].map(([c, d]) => `<div class="tool"><code>${c}</code><span>${d}</span></div>`).join('')}
+  ${[['get_balances', 'Balances and net worth'], ['list_transactions', 'Find transactions'], ['spending_summary', 'Spending by category for any month'], ['budget_status', "What’s left in each budget"], ['list_goals', 'Savings goals'], ['set_category', "Change a transaction’s category"], ['add_cash_purchase', 'Add something paid in cash'], ['add_to_goal', 'Record savings toward a goal'], ['safe_to_spend', 'Safe to spend until payday'], ['list_bills', 'Bills and subscriptions'], ['month_report', 'How a month went'], ['year_review', 'Your year in review'], ['payoff_plan', 'How long a card or loan takes to pay off'], ['set_budget', 'Set a budget'], ['update_price', 'Update a holding’s price'], ['create_goal', 'Create a goal'], ['refresh_banks', 'Update from banks now'], ['undo_last_change', 'Undo the last change']].map(([c, d]) => `<div class="tool"><code>${c}</code><span>${d}</span></div>`).join('')}
   <p class="pad small muted" style="margin:0">It acts as you, can’t move money and never sees bank passwords.</p>${LAPTOP ? '<div class="pad" style="padding-top:8px"><button class="btn sm" type="button" data-act="assistants">Connect or manage assistants</button></div>' : ''}</div>`;
   if (WIDE()) return page.replace(/(<\/header>)/, '$1<div class="dash page"><div class="col-main">') + '</div><aside class="col-side">' + side + '</aside></div>';
   return page.replace('</section>', '</section>' + worthChart(nw)) + side.replace(worthChart(nw), '');
@@ -1064,7 +1069,7 @@ function addSheet(a = '', m = '', c = 'groceries') {
   <div class="amtin"><span>$</span><input id="ca" inputmode="decimal" placeholder="0.00" value="${esc(a)}" aria-label="Amount"></div>
   <label class="f">What was it?<input class="inp" id="cm" placeholder="Farmers market" value="${esc(m)}"></label>${catButtons(c, 'cat', ['income', 'transfer'])}
   <label class="f">When<input class="inp" id="cd" type="date" value="${TODAY}" max="${TODAY}"></label>
-  <p class="note">Card and bank charges come in from your bank by themselves. This is for cash, or anything your bank doesn't show.</p>
+  <p class="note">Card and bank charges come in from your bank by themselves. This is for cash, or anything your bank doesn’t show.</p>
   <div class="btns"><button class="btn primary" type="button" id="ok">Add it</button><button class="btn" type="button" data-close>Cancel</button></div>`, root => {
     const gc = pickable(root, 'cat'); if (a) root.querySelector('#ok').focus({ preventScroll: true });
     root.querySelector('#ok').onclick = async () => {
@@ -1078,7 +1083,7 @@ function editTxn(id) {
   const head = `<div class="rev-card"><small>${longDate(t.date)} · ${esc(acct(t.acct).name)}${t.pending ? ' · Pending' : ''}</small><div class="big num">${t.a > 0 ? '+' : ''}${money(t.a, { abs: t.a > 0 })}</div>${t.orig ? `<small>Was ${curMoney(t.orig.a, t.orig.cur, { abs: true })}</small>` : ''}<b>${esc(t.m)}</b></div>`;
   if (t.other) return sheet(head + `<p class="note">This is on ${esc(acct(t.acct).owner)}’s shared account, so only they can change it. It doesn’t count toward your budgets.</p><div class="btns"><button class="btn" type="button" data-close>Close</button></div>`);
   const pair = t.pair && S.txns.find(x => x.id === t.pair);
-  sheet(head + `${t.changed ? `<p class="note"><b>${esc(t.m)} changed from ${changedAmt(t, 'was')} to ${changedAmt(t, 'now')} after you split it.</b> Your changes are kept${t.split ? ' and the first part took the difference' : ''}${t.sentTo ? `. Split it still has the old amount, so fix it there too if it’s wrong` : ''}. Save to mark it checked.</p>` : ''}${pair ? `<p class="note">Matched with ${money(pair.a, { abs: true })} ${pair.a > 0 ? 'arriving in' : 'leaving'} ${esc(acct(pair.acct).name)} on ${monName(B.ymOf(pair.date))} ${+pair.date.slice(8)}, so it's a transfer and doesn't count as spending. Pick another category if that's wrong.</p>` : ''}
+  sheet(head + `${t.changed ? `<p class="note"><b>${esc(t.m)} changed from ${changedAmt(t, 'was')} to ${changedAmt(t, 'now')} after you split it.</b> Your changes are kept${t.split ? ' and the first part took the difference' : ''}${t.sentTo ? `. Split it still has the old amount, so fix it there too if it’s wrong` : ''}. Save to mark it checked.</p>` : ''}${pair ? `<p class="note">Matched with ${money(pair.a, { abs: true })} ${pair.a > 0 ? 'arriving in' : 'leaving'} ${esc(acct(pair.acct).name)} on ${monName(B.ymOf(pair.date))} ${+pair.date.slice(8)}, so it’s a transfer and doesn’t count as spending. Pick another category if that’s wrong.</p>` : ''}
   ${catButtons(t.c)}
   <label class="chk"><input type="checkbox" id="rule"><span>Always put <b>${esc(B.ruleName(t.m))}</b> here, including past charges</span></label>
   <label class="f">Name<input class="inp" id="nm" value="${esc(t.m)}"></label>
@@ -1086,7 +1091,7 @@ function editTxn(id) {
   <label class="f">Tags<input class="inp" id="tg" value="${esc((t.tags || []).map(x => '#' + x).join(' '))}" placeholder="#japan-trip #wedding"></label>
   <label class="chk"><input type="checkbox" id="hd" ${t.hidden ? 'checked' : ''}><span><b>Don’t count this</b><br><span class="muted small">Leaves it out of budgets and totals. For a refunded purchase, a work expense you get back, or a one-off.</span></span></label>
   <div class="rcpt">${t.receipt ? `<a href="${esc(receiptSrc(t.receipt))}" target="_blank" rel="noopener"><img src="${esc(receiptSrc(t.receipt))}" alt="Receipt photo"></a>` : ''}
-    <label class="btn sm">${svg('cam', 'ico')} ${t.receipt ? 'Replace receipt' : 'Add a receipt photo'}<input type="file" id="rp" accept="image/*" capture="environment" hidden></label>
+    <button class="btn sm" type="button" id="rpBtn">${svg('cam', 'ico')} ${t.receipt ? 'Replace receipt' : 'Add a receipt photo'}</button><input type="file" id="rp" accept="image/*" capture="environment" hidden aria-label="Receipt photo">
     ${t.receipt ? '<button class="btn sm" type="button" id="rr">Remove</button>' : ''}</div>
   ${t.a < 0 ? `<button class="btn block" type="button" id="si">${t.sentTo ? 'Sent to Split it (' + esc(t.sentTo) + '). Send again' : 'Split it with someone'}</button>` : ''}
   ${t.a < 0 && !t.split ? `<details><summary style="font-weight:800;cursor:pointer">Split into two categories</summary><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px"><label class="f">Amount to move<input class="inp" id="sa" inputmode="decimal" placeholder="20.00"></label>${catButtons('', 'scat', ['income', 'transfer'])}</div></details>` : ''}
@@ -1095,7 +1100,9 @@ function editTxn(id) {
     const del = root.querySelector('#del'); if (del) del.onclick = () => { close(); api('txn.delete', { id }); };
     const si = root.querySelector('#si'); if (si) si.onclick = () => splitSheet(t);
     if (CLOUD && t.receipt === 'rc') CCOL.doc('rc-' + t.id).get().then(d => { const x = d.exists && d.data().data; if (!x) return; root.querySelectorAll('.rcpt img').forEach(i => { i.src = x; }); const l = root.querySelector('.rcpt a'); if (l) l.href = x; }).catch(() => {});
-    const rr = root.querySelector('#rr'); if (rr) rr.onclick = () => { close(); LAPTOP ? post('/api/receipt', { id, data: '' }) : api('txn.receipt', { id, receipt: '' }); };
+    root.querySelector('#rpBtn').onclick = () => root.querySelector('#rp').click();
+    // removing a photo takes a second tap, so it isn't removed by accident
+    const rr = root.querySelector('#rr'); if (rr) rr.onclick = () => { if (!confirmTap(rr, 'Tap again to remove it')) return; close(); LAPTOP ? post('/api/receipt', { id, data: '' }) : api('txn.receipt', { id, receipt: '' }); };
     root.querySelector('#rp').onchange = async e => {
       const f = e.target.files[0]; if (!f) return;
       try { const data = await shrinkPhoto(f); close(); if (LAPTOP) post('/api/receipt', { id, data }); else api('txn.receipt', { id, receipt: data }); }
@@ -1115,7 +1122,7 @@ async function splitSheet(t) {
   if (LAPTOP && !VIEW.splitit) return splitConnect(() => splitSheet(t));
   let groups = ['House', 'Japan trip'];
   if (LAPTOP) { const j = await getJ('/api/splitit/groups'); if (!j) return; groups = j.groups; }
-  if (!groups.length) return sheet(`<h3>No groups in Split it yet</h3><p>Make a group in Split it first, like "House", then come back.</p><div class="btns"><button class="btn" type="button" data-close>OK</button></div>`);
+  if (!groups.length) return sheet(`<h3>No groups in Split it yet</h3><p>Make a group in Split it first, like “House”, then come back.</p><div class="btns"><button class="btn" type="button" data-close>OK</button></div>`);
   sheet(`<h3>Split it with someone</h3><p style="margin:-6px 0 0">Adds this to Split it as a shared expense you paid, split equally with everyone in the group.</p>
   <label class="f">What for<input class="inp" id="st" value="${esc(B.baseName(t.m))}"></label>
   <div class="amtin"><span>$</span><input id="sm" inputmode="decimal" value="${(-t.a).toFixed(2)}" aria-label="Amount to split"></div>
@@ -1135,7 +1142,7 @@ async function splitSheet(t) {
 }
 function splitConnect(then) {
   sheet(`<h3>Connect Split it</h3><p style="margin:-6px 0 0">Send charges to <b>Split it</b>, the bill splitter from Budget it, without typing them again.</p>
-  <ol class="small" style="margin:0;padding-left:20px;line-height:1.5"><li>On the laptop, in Split it's folder, run <code>node server.js mcp-key ${esc(VIEW.me.name.split(' ')[0])}</code></li><li>Paste the key it prints below. It acts as you in Split it.</li></ol>
+  <ol class="small" style="margin:0;padding-left:20px;line-height:1.5"><li>On the laptop, in Split it’s folder, run <code>node server.js mcp-key ${esc(VIEW.me.name.split(' ')[0])}</code></li><li>Paste the key it prints below. It acts as you in Split it.</li></ol>
   <label class="f">Split it address<input class="inp" id="su" value="${esc(VIEW.splititUrl || 'http://localhost:8080')}"></label>
   <label class="f">Key<input class="inp" id="sk" autocomplete="off" spellcheck="false" placeholder="hsk_..."></label>
   <div class="btns"><button class="btn primary" type="button" id="ok">Connect</button>${VIEW.splitit ? '<button class="btn" type="button" id="off">Disconnect</button>' : '<button class="btn" type="button" data-close>Cancel</button>'}</div>`, root => {
@@ -1184,8 +1191,8 @@ const acctOptions = sel => ownAccts().filter(a => a.type !== 'Credit card' && a.
 function addGoal(id) {
   const g = S.goals.find(x => x.id === id); if (!g) return;
   const saved = B.goalSaved(S, g);
-  if (g.acct) return sheet(`<h3>${esc(g.n)}</h3><p style="margin:-6px 0 0">This goal follows <b>${esc(acct(g.acct).name)}</b>. What's saved is that account's balance, ${money(saved)}, so it updates by itself.</p>
-    <label class="f">Follow<select class="inp" id="ga"><option value="">Nothing, I'll add savings myself</option>${acctOptions(g.acct)}</select></label>
+  if (g.acct) return sheet(`<h3>${esc(g.n)}</h3><p style="margin:-6px 0 0">This goal follows <b>${esc(acct(g.acct).name)}</b>. What’s saved is that account’s balance, ${money(saved)}, so it updates by itself.</p>
+    <label class="f">Follow<select class="inp" id="ga"><option value="">Nothing, I’ll add savings myself</option>${acctOptions(g.acct)}</select></label>
     <div class="btns"><button class="btn primary" type="button" id="ok">Save</button><button class="btn" type="button" id="rm">Delete goal</button></div>`, root => {
       root.querySelector('#rm').onclick = () => { close(); api('goal.delete', { id }); };
       root.querySelector('#ok').onclick = () => { close(); api('goal.link', { id, acct: root.querySelector('#ga').value }); };
@@ -1194,7 +1201,7 @@ function addGoal(id) {
   <div class="amtin"><span>$</span><input id="ga" inputmode="decimal" value="${Math.max(0, Math.min(100, g.target - saved)).toFixed(2)}" aria-label="Amount"></div>
   <p class="small muted" style="margin:-6px 0 0">${money(Math.max(0, g.target - saved))} to go.</p>
   <p class="note">This updates Budget it only. Move the real money in your bank app. Saving in its own account? Let the goal follow that account instead.</p>
-  ${acctOptions() ? `<label class="f">Or follow an account<select class="inp" id="gl"><option value="">No, I'll add savings myself</option>${acctOptions()}</select></label>` : ''}
+  ${acctOptions() ? `<label class="f">Or follow an account<select class="inp" id="gl"><option value="">No, I’ll add savings myself</option>${acctOptions()}</select></label>` : ''}
   <div class="btns"><button class="btn primary" type="button" id="ok">Save</button><button class="btn" type="button" id="rm">Delete goal</button></div>`, root => {
     root.querySelector('#rm').onclick = () => { close(); api('goal.delete', { id }); };
     root.querySelector('#ok').onclick = () => { const link = root.querySelector('#gl')?.value; close(); if (link) return api('goal.link', { id, acct: link });
@@ -1206,7 +1213,7 @@ function newGoal() {
   sheet(`<h3>New savings goal</h3><label class="f">Name<input class="inp" id="gn" placeholder="Winter tires"></label>
   <div class="amtin"><span>$</span><input id="gt" inputmode="decimal" placeholder="900" aria-label="Goal amount"></div>
   <label class="f">Finish by<select class="inp" id="gb">${opts.map((v, i) => `<option value="${v}" ${i === 5 ? 'selected' : ''}>${monName(v, 1)} ${v.slice(0, 4)}</option>`).join('')}</select></label>
-  ${acctOptions() ? `<label class="f">Follow an account (optional)<select class="inp" id="gl"><option value="">No, I'll add savings myself</option>${acctOptions()}</select></label>` : ''}
+  ${acctOptions() ? `<label class="f">Follow an account (optional)<select class="inp" id="gl"><option value="">No, I’ll add savings myself</option>${acctOptions()}</select></label>` : ''}
   <div class="btns"><button class="btn primary" type="button" id="ok">Create</button><button class="btn" type="button" data-close>Cancel</button></div>`, root => {
     root.querySelector('#ok').onclick = () => { const n = root.querySelector('#gn').value.trim(), t = num(root.querySelector('#gt').value); if (!n || !(t > 0)) return toast('Add a name and an amount', false); close(); api('goal.add', { n, target: t, by: root.querySelector('#gb').value, acct: root.querySelector('#gl')?.value || '' }); };
   });
@@ -1226,14 +1233,14 @@ function billSheet(key) {
 }
 function billForm(b) {
   b = b || { n: '', a: '', d: B.dayOf(TODAY), every: 'month', month: +CUR.slice(5), c: 'home', sub: false };
-  sheet(`<h3>${b.id ? esc(b.n) : 'Add a bill'}</h3><p class="muted" style="margin:-8px 0 0">For bills Budget it can't spot by itself, like yearly insurance or a bill paid in cash.</p>
+  sheet(`<h3>${b.id ? esc(b.n) : 'Add a bill'}</h3><p class="muted" style="margin:-8px 0 0">For bills Budget it can’t spot by itself, like yearly insurance or a bill paid in cash.</p>
   <label class="f">Name<input class="inp" id="bn" value="${esc(b.n)}" placeholder="Car insurance"></label>
   <div class="amtin"><span>$</span><input id="ba" inputmode="decimal" value="${b.a}" placeholder="0.00" aria-label="Amount"></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="f">How often<select class="inp" id="be"><option value="month" ${b.every !== 'year' ? 'selected' : ''}>Every month</option><option value="year" ${b.every === 'year' ? 'selected' : ''}>Every year</option></select></label>
   <label class="f">Day<input class="inp" id="bd" inputmode="numeric" value="${b.d}"></label></div>
   <label class="f" id="bmw" ${b.every === 'year' ? '' : 'hidden'}>Month<select class="inp" id="bm">${MONL.map((m, i) => `<option value="${i + 1}" ${+b.month === i + 1 ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
   ${catButtons(b.c, 'cat', ['income', 'transfer'])}
-  <label class="chk"><input type="checkbox" id="bs" ${b.sub ? 'checked' : ''}><span>It's a subscription</span></label>
+  <label class="chk"><input type="checkbox" id="bs" ${b.sub ? 'checked' : ''}><span>It’s a subscription</span></label>
   <div class="btns"><button class="btn primary" type="button" id="ok">Save</button>${b.id ? '<button class="btn" type="button" id="rm">Remove</button>' : '<button class="btn" type="button" data-close>Cancel</button>'}</div>`, root => {
     const gc = pickable(root, 'cat');
     root.querySelector('#be').onchange = e => root.querySelector('#bmw').hidden = e.target.value !== 'year';
@@ -1249,7 +1256,7 @@ function safeSheet() {
   <div class="card"><div class="row" style="border:0">${ticK('bank', '--c1')}<span class="rt"><b>In chequing</b></span><span class="amt">${money(x.cash)}</span></div>
   <div class="row">${ticK('lock', '--c7')}<span class="rt"><b>Owing on cards</b><small>Already spent</small></span><span class="amt">${money(x.cards)}</span></div>
   <div class="row">${ticK('cal', '--c6')}<span class="rt"><b>Bills before payday</b><small>${x.bills.map(b => esc(b.n)).join(', ') || 'None'}</small></span><span class="amt">−${money(x.billsTotal)}</span></div></div>
-  <p class="note">Your pay looks like ${esc(x.payday.name)}, about ${money(x.payday.amount, { round: true })} ${esc(x.payday.every)}. Savings accounts aren't counted.</p>
+  <p class="note">Your pay looks like ${esc(x.payday.name)}, about ${money(x.payday.amount, { round: true })} ${esc(x.payday.every)}. Savings accounts aren’t counted.</p>
   <div class="btns"><button class="btn primary" type="button" data-close>Got it</button></div>`);
 }
 function alertSheet(key) {
@@ -1263,7 +1270,7 @@ function alertSheet(key) {
 }
 function csv() {
   const imported = S.accounts.filter(a => a.csv && !a.other);
-  sheet(`<h3>Import a CSV</h3><p style="margin:-6px 0 0">For banks Plaid can't reach. Download a CSV of transactions from your bank's website and pick it here. Budget it understands most bank exports, and skips rows it already has.</p>
+  sheet(`<h3>Import a CSV</h3><p style="margin:-6px 0 0">For banks Plaid can’t reach. Download a CSV of transactions from your bank’s website and pick it here. Budget it understands most bank exports, and skips rows it already has.</p>
   ${imported.length ? `<label class="f">Add to<select class="inp" id="ca"><option value="">A new account</option>${imported.map(a => `<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('')}</select></label>` : ''}
   <label class="f">Account name<input class="inp" id="cn" placeholder="Credit union chequing"></label>
   <label class="f">CSV file<input class="inp" type="file" id="cf" accept=".csv,text/csv"></label>
@@ -1358,13 +1365,13 @@ async function openLink(item, back) {
   h.open();
 }
 function plaid() {
-  if (CLOUD) return sheet(`<h3>Add your accounts</h3><p style="margin:-6px 0 0">Here you can import transactions from your bank's website as a CSV, or add an account by hand and keep its balance up to date.</p>
+  if (CLOUD) return sheet(`<h3>Add your accounts</h3><p style="margin:-6px 0 0">Here you can import transactions from your bank’s website as a CSV, or add an account by hand and keep its balance up to date.</p>
   <p class="note">Bank connections through Plaid work in the laptop app, because the Plaid keys have to stay on your own computer.</p>
   <div class="btns"><button class="btn primary" type="button" data-act="csv">Import a CSV</button><button class="btn" type="button" data-act="addacct">Add by hand</button><button class="btn" type="button" data-close>Cancel</button></div>`);
   const ready = LAPTOP && VIEW.plaid.configured;
-  sheet(`<h3>Connect a bank</h3><p style="margin:-6px 0 0">Budget it uses <b>Plaid</b> to bring in balances and transactions. You sign in to your bank in Plaid's own window, so Budget it never sees your bank password.</p>
-  <div class="facts"><div>${svg('eye', '')}<span><b>Read only</b>Budget it can see balances and transactions. It can't move money.</span></div><div>${svg('laptop', '')}<span><b>Stays on your laptop</b>The bank connection is saved encrypted on your own computer.</span></div><div>${svg('x', '')}<span><b>Disconnect any time</b>Remove a bank here and its connection is deleted at Plaid too.</span></div></div>
-  ${!LAPTOP ? `<p class="note">This preview can't reach Plaid. The button adds a test bank with a few sample charges, like the laptop app does in Plaid's test mode.</p>`
+  sheet(`<h3>Connect a bank</h3><p style="margin:-6px 0 0">Budget it uses <b>Plaid</b> to bring in balances and transactions. You sign in to your bank in Plaid’s own window, so Budget it never sees your bank password.</p>
+  <div class="facts"><div>${svg('eye', '')}<span><b>Read only</b>Budget it can see balances and transactions. It can’t move money.</span></div><div>${svg('laptop', '')}<span><b>Stays on your laptop</b>The bank connection is saved encrypted on your own computer.</span></div><div>${svg('x', '')}<span><b>Disconnect any time</b>Remove a bank here and its connection is deleted at Plaid too.</span></div></div>
+  ${!LAPTOP ? `<p class="note">This preview can’t reach Plaid. The button adds a test bank with a few sample charges, like the laptop app does in Plaid’s test mode.</p>`
     : !ready ? `<p class="note">Plaid isn’t set up on this laptop yet. Whoever runs Budget it adds PLAID_CLIENT_ID and PLAID_SECRET to budget-it.env (see the README), then restarts it. CSV import works in the meantime.</p>`
     : VIEW.plaid.env !== 'production' ? `<p class="note">Plaid test mode: pick any bank and sign in with <b>user_good</b> / <b>pass_good</b>. Real banks work once Plaid approves production.</p>`
     : VIEW.plaid.limit ? `<p class="note"><b>${VIEW.plaid.used} of ${VIEW.plaid.limit} bank connections used</b> on this laptop. Plaid’s free plan counts every bank you connect, and disconnecting one doesn’t give it back. ${VIEW.plaid.used >= VIEW.plaid.limit ? 'Plaid will probably refuse another one. CSV import and accounts you keep by hand still work.' : 'If a bank stops updating, use Reconnect on it instead of removing it and adding it again.'}</p>` : ''}
@@ -1486,7 +1493,7 @@ function settings() {
   ${LAPTOP ? row('push', 'bell', '--c4', 'Phone notifications', 'Budgets, bills, a weekly check-in and alerts') + row('friends', 'people', '--c3', 'People and friends', FREQS ? `${FREQS} friend request${FREQS === 1 ? '' : 's'} waiting` : 'Your @tag, find people, invite someone')
     + row('signin', 'lock', '--c6', 'Your sign-in', 'Password, email and a sign-in code') + row('assistants', 'bot', '--c6', 'AI assistants', 'Connect Claude, Muse or ChatGPT to your budget') + row('mydata', 'file', '--c7', 'Your data', 'Download a copy of it, or delete it and your account') + (VIEW.me.owner ? row('owner', 'gear', '--c1', 'People, backups and health', 'For whoever runs this Budget it') : '') : ''}
   ${row('export', 'file', '--c5', 'Export transactions', 'Everything as a CSV, for taxes or a spreadsheet')}
-  ${row('whatsnew', 'star', '--c4', "What's new", 'v' + esc(VIEW.version))}
+  ${row('whatsnew', 'star', '--c4', "What’s new", 'v' + esc(VIEW.version))}
   ${S.sample ? row('unsample', 'x', '--c7', 'Remove sample data', 'Keeps your own accounts and anything you added') : ''}
   ${CLOUD ? row('wipe', 'x', '--c8', 'Start over', 'Delete everything in this budget') : !LAPTOP ? row('reset', 'sync', '--c8', 'Reset the preview', 'Start over with fresh sample data') : `<a class="row" href="/api/logout" data-signout style="text-decoration:none">${ticK('out', '--c8')}<span class="rt"><b>Sign out</b><small>${esc(VIEW.me.name)}</small></span><span></span></a>`}</div>
   <div class="btns"><button class="btn" type="button" data-close>Done</button></div>`, root => root.querySelectorAll('[data-guide]').forEach(b => b.onclick = () => { close(); api('guide.set', { guide: b.dataset.guide }, true); }));
@@ -1511,7 +1518,8 @@ function moneySheet() {
 }
 // ---------- your sign-in, and the page for whoever runs this Budget it (laptop app) ----------
 async function call(url, body, method) {
-  const r = await fetch(url, { method: method || (body ? 'POST' : 'GET'), credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  const r = await fetch(url, { method: method || (body ? 'POST' : 'GET'), credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+    .catch(() => { throw new Error('Couldn’t reach the laptop. Check your connection and try again.'); });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.error === 'signed out' ? 'You’re signed out. Sign in again.' : d.error || 'That didn’t work. Try again.');
   return d;
@@ -1663,7 +1671,7 @@ async function friendsSheet() {
   FREQS = fr.incoming.length;
   const who = r => `${esc(r.name)}${r.tag ? ' · @' + esc(r.tag) : ''}`;
   sheet(`<h3>People and friends</h3>
-  <div class="card loose">${line('people', '--c3', 'Your tag', a.tag ? `<b>@${esc(a.tag)}</b> · people here find you with it` : 'Not set yet', '<button class="btn sm" type="button" id="frTag">Change</button>')}
+  <div class="card loose">${line('people', '--c3', 'Your tag', a.tag ? `<strong>@${esc(a.tag)}</strong> · people here find you with it` : 'Not set yet', '<button class="btn sm" type="button" id="frTag">Change</button>')}
   ${line('people', '--c4', 'Your friend link', 'A link or QR code. Whoever opens it becomes your friend.', '<button class="btn sm" type="button" id="frLink">Show</button>')}</div>
   <div id="frForm" style="display:contents"></div>
   <label class="f">Find someone already on Budget it<span class="keyrow"><input class="inp" id="frQ" placeholder="@tag or their email" autocapitalize="off" autocomplete="off" spellcheck="false"><button class="btn" type="button" id="frFind">Find</button></span></label>
@@ -1745,7 +1753,7 @@ async function ownerSheet() {
     const form = root.querySelector('#owForm');
     root.querySelectorAll('[data-person]').forEach(b => b.onclick = () => personSheet(o.people.find(p => p.id === b.dataset.person)));
     call('/api/admin/update').then(u => { const el = root.querySelector('#owUpdate'); if (!el || !u || !u.newer) return;
-      el.innerHTML = `<p class="warnbox">Budget it v${esc(u.latest)} is out. This laptop runs v${esc(u.current)}. ${u.url ? `<a href="${esc(u.url)}" target="_blank" rel="noopener">See what’s new</a>. ` : ''}To update, on the laptop: <code>git pull</code>, then <code>bash install.sh</code>.</p>`; }).catch(() => {});
+      el.innerHTML = `<p class="warnbox">${u.security ? '<b style="color:var(--bad)">Security update.</b> ' : ''}Budget it v${esc(u.latest)} is out. This laptop runs v${esc(u.current)}. ${u.url ? `<a href="${esc(u.url)}" target="_blank" rel="noopener">See what’s new</a>. ` : ''}To update, on the laptop: <code>git pull</code>, then <code>bash install.sh</code>.</p>`; }).catch(() => {});
     root.querySelector('#owDown').onclick = () => {
       miniForm(form, `<label class="f">Lock it with a passphrase<input class="inp" id="owPass" type="password" autocomplete="new-password" placeholder="At least 8 characters"></label>
         <p class="small muted" style="margin:0">Anyone who opens an unlocked backup can read every budget in it and use the bank connections. A locked one can only be opened with this passphrase, so don’t lose it: there is no way to get it back.</p>
@@ -1810,7 +1818,7 @@ function personSheet(p) {
       box.querySelector('#ppCopy').onclick = () => copyText(r.url, 'Reset link copied'); });
     root.querySelector('#ppRename').onclick = () => miniForm(box, `<label class="f">New sign-in name<input class="inp" id="ppName" maxlength="30" value="${esc(p.name)}"></label>`, 'Save',
       async () => { await call('/api/admin/rename', { id: p.id, name: box.querySelector('#ppName').value }); toast('Saved', false); ownerSheet(); });
-    root.querySelector('#ppOut').onclick = () => tryIt(async () => { const r = await call('/api/admin/signout', { id: p.id }); toast(`Signed out of ${r.sessions} device${r.sessions === 1 ? '' : 's'}`, false); if (me) location.href = '/login'; });
+    const ppOut = root.querySelector('#ppOut'); ppOut.onclick = () => { if (!confirmTap(ppOut.querySelector('b'), me ? 'Tap again: this signs you out too' : 'Tap again to sign them out')) return; tryIt(async () => { const r = await call('/api/admin/signout', { id: p.id }); toast(`Signed out of ${r.sessions} device${r.sessions === 1 ? '' : 's'}`, false); if (me) location.href = '/login'; }); };
     const cd = root.querySelector('#ppCode'); if (cd) cd.onclick = () => { if (!confirmTap(cd.querySelector('b'), 'Tap again to turn it off')) return; tryIt(async () => { await call('/api/admin/code-off', { id: p.id }); toast('Sign-in code turned off', false); ownerSheet(); }); };
     const ow = root.querySelector('#ppOwner'); if (ow) ow.onclick = () => tryIt(async () => { await call('/api/admin/owner', { id: p.id, owner: !p.owner }); toast(p.owner ? 'They no longer run it' : 'They run it too now', false); ownerSheet(); });
     const rm = root.querySelector('#ppRemove'); if (rm) rm.onclick = () => { if (!confirmTap(rm.querySelector('b'), `Remove ${p.name} for good? Tap again`)) return; tryIt(async () => { await call('/api/admin/remove', { id: p.id }); toast(`Removed ${p.name}`, false); ownerSheet(); }); };
@@ -1822,7 +1830,7 @@ function whatsnew() {
   <div class="facts"><div>${svg('bank', '')}<span><b>Your history stays</b>Disconnect a bank and its charges and your edits stay. Reconnect it and the history carries on.</span></div><div>${svg('people', '')}<span><b>Find your people</b>An @tag, a friend link with a QR code, and accounts shared only with the people you pick.</span></div><div>${svg('lock', '')}<span><b>Your data, your call</b>Download your data or delete it, and give an assistant read-only access.</span></div></div>
   <div class="rel"><h4>New</h4><ul><li>AI assistants in Settings: your connector link, one-tap Allow, read-only keys, and Disconnect.</li><li>People and friends: your @tag, find people by @tag or email, friend requests and a friend link with a QR code.</li><li>Share an account with the people you pick, instead of everyone here.</li><li>Disconnecting a bank keeps its history, and reconnecting carries it on with no doubles.</li><li>A heads-up when a bank needs you to sign in again, or a charge changes after you split it.</li><li>Download my data, and delete my data.</li></ul>
   <h4>Improved</h4><ul><li>New banks bring up to two years of history.</li><li>Changes made offline that couldn’t be saved are shown to you instead of vanishing.</li><li>A sign-in you keep using stays signed in.</li><li>Extra safety copies of your budget at every start and every 6 hours.</li></ul>
-  <h4>Fixed</h4><ul><li>One person’s wrong passwords no longer lock everyone out.</li><li>A full disk no longer stops the app.</li><li>Assistants can always connect, and a retry can’t add the same thing twice.</li></ul>
+  <h4>Fixed</h4><ul><li>One person’s wrong passwords no longer lock everyone out.</li><li>A full disk no longer stops the app.</li><li>Assistants can always connect, and a retry can’t add the same thing twice.</li><li>Lots of smaller fixes to CSV import, bills, reminders, undo and the look on phones and laptops.</li></ul>
   <h4>Security</h4><ul><li>Changes from other websites are refused, sign-ins are stored hashed, and changing your email needs your password.</li><li>Unused assistant keys stop working after 90 days.</li><li>Backup copies leave out the bank key until they’re locked with a passphrase.</li></ul></div>
   <details class="rel"><summary><b>v1.0.0 · Meet Budget it</b></summary><div><h4>New</h4><ul><li>Accounts and net worth from Plaid, plus CSV import with a preview first.</li><li>Every month of history, and trends over 12 months: your usual month and what stood out.</li><li>Monthly budgets with rollover, carry-over of overspending, a per-day amount and suggestions.</li><li>Your own categories, and rules that match the start of a name or anywhere in it.</li><li>Transfers between your accounts are matched so they don't count as spending.</li><li>Hide a charge, tag charges like #japan-trip, split one across categories, add a receipt photo.</li><li>Your year in review, net worth over time, and a payoff planner for cards and loans.</li><li>Investment holdings with their value and gain, from your bank or added by hand.</li><li>Accounts in other currencies, like a US dollar account, added up in your home currency.</li><li>Change many charges at once, and search every month by name, note, amount or #tag.</li><li>Bills and subscriptions found from repeat charges, plus ones you add, monthly or yearly.</li><li>Heads-ups for big charges, new subscriptions, price increases and low chequing.</li><li>Savings goals, including goals that follow a savings account.</li><li>A Sunday check-in on your week, and nudges before a budget runs out.</li><li>Hide amounts with one tap, and export everything as a CSV.</li><li>Household sharing, quick add for cash, and Luffy and Hancock as guides.</li><li>Its own assistant connection: ask Claude or Muse about your money.</li><li>Send a charge to Split it and count only your share in your budget.</li><li>Your sign-in in Settings: change your password, add an email, and turn on a sign-in code from an authenticator app.</li><li>For whoever runs it: a page with people, reset links, health, backups and restore.</li><li>Today's rates for any home currency, not just CAD.</li></ul>
   <h4>Security</h4><ul><li>Bank connections are encrypted on your laptop and never leave it.</li><li>Receipt photos are kept on the laptop and only you can see yours.</li><li>Invite-only sign-in, the same as Split it, with an optional sign-in code as a second step.</li><li>Backups you can lock with a passphrase, and a locked copy to a second place every day.</li><li>Changing or resetting a password signs out your other phones at once.</li><li>Whoever runs it sees who is here and whether things work, never anyone's money.</li></ul>
@@ -1859,8 +1867,8 @@ document.addEventListener('click', e => {
     private: () => { PRIVATE = !PRIVATE; store.set('bi-private', PRIVATE); close(); render(); toast(PRIVATE ? 'Amounts are hidden. Tap the eye to show them.' : 'Amounts are showing', false); },
     splitit: () => { close(); if (LAPTOP) return splitConnect(); if (CLOUD) return toast('Sending to Split it works in the laptop app, where both apps run.', false); toast('On the laptop, connect Split it here, then use "Split it with someone" on any charge.', false); },
     select: () => { selecting = true; picked = new Set(); render(); }, selectoff: () => { selecting = false; picked = new Set(); render(); },
-    bulkcat: () => sheet(`<h3>Move ${picked.size} to</h3>${catButtons('')}<div class="btns"><button class="btn" type="button" data-close>Cancel</button></div>`, root => root.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { close(); bulk({ c: b.dataset.cat }); })),
-    bulktag: () => sheet(`<h3>Tag ${picked.size}</h3><label class="f">Tag<input class="inp" id="tg" placeholder="#japan-trip"></label><div class="btns"><button class="btn primary" type="button" id="ok">Add tag</button><button class="btn" type="button" data-close>Cancel</button></div>`, root => root.querySelector('#ok').onclick = () => { const v = root.querySelector('#tg').value.trim(); if (!v) return; close(); bulk({ tag: v }); }),
+    bulkcat: () => sheet(`<h3>Move ${picked.size} charge${picked.size === 1 ? '' : 's'} to</h3>${catButtons('')}<div class="btns"><button class="btn" type="button" data-close>Cancel</button></div>`, root => root.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { close(); bulk({ c: b.dataset.cat }); })),
+    bulktag: () => sheet(`<h3>Tag ${picked.size} charge${picked.size === 1 ? '' : 's'}</h3><label class="f">Tag<input class="inp" id="tg" placeholder="#japan-trip"></label><div class="btns"><button class="btn primary" type="button" id="ok">Add tag</button><button class="btn" type="button" data-close>Cancel</button></div>`, root => root.querySelector('#ok').onclick = () => { const v = root.querySelector('#tg').value.trim(); if (!v) return; close(); bulk({ tag: v }); }),
     bulkhide: () => bulk({ hidden: true }),
     more: () => { shown += 200; render(); }, suggest: () => api('budget.suggest'), sample: () => api('sample.load'), unsample: () => { close(); api('sample.clear'); },
     sync: async () => { toast('Asking your banks…', false); await post('/api/plaid/sync'); },
@@ -1874,7 +1882,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') return close();
   // Tab stays inside an open sheet, so keyboard and screen reader users don't wander behind it
   if (e.key === 'Tab') {
-    const f = [...L.querySelectorAll('.sheet button:not([disabled]),.sheet input,.sheet select,.sheet a[href],.sheet label.btn')].filter(x => x.offsetParent !== null);
+    const f = [...L.querySelectorAll('.sheet button:not([disabled]),.sheet input,.sheet select,.sheet textarea,.sheet summary,.sheet a[href],.sheet label.btn')].filter(x => x.offsetParent !== null);
     if (!f.length) return;
     const first = f[0], last = f[f.length - 1];
     if (e.shiftKey && (document.activeElement === first || !L.contains(document.activeElement))) { e.preventDefault(); last.focus(); }

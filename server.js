@@ -147,7 +147,7 @@ const undo = new Map();   // uid -> [snapshots], in memory: undo is for the last
 
 // Who besides its owner can see an account: a list of people. Before 1.1 `shared: true` meant everyone on this
 // Budget it; that still reads as everyone until migrateShares turns it into the list of people who were here.
-const sharedWith = (a, owner) => Array.isArray(a.shared) ? a.shared.filter(id => id !== owner && users.users[id])
+const sharedWith = (a, owner) => Array.isArray(a.shared) ? a.shared.filter(id => id !== owner && Object.hasOwn(users.users, id))   // never "constructor"
   : a.shared === true ? Object.keys(users.users).filter(id => id !== owner) : [];
 function migrateShares() {
   let n = 0;
@@ -182,7 +182,9 @@ function viewFor(uid) {
 }
 
 // ---------- changes the page (and the assistant) can make ----------
-const { OPS, num, text, bad } = require('./ops')(B, { today: () => today(), rid, sample });
+// Sample data is made up, so its accounts are nobody else's business: `shared: true` would mean everyone here
+const ownSample = d => { const x = sample(d); for (const a of x.accounts) a.shared = []; return x; };
+const { OPS, num, text, bad } = require('./ops')(B, { today: () => today(), rid, sample: ownSample });
 function applyOp(uid, op, args = {}, inside) {
   if ((op === 'txn.receipt' || op === 'txn.sent' || op === 'txn.share') && !inside) bad('Unknown change: ' + op);
   if (op === 'undo') {
@@ -201,6 +203,7 @@ function applyOp(uid, op, args = {}, inside) {
   if (JSON.stringify(s) !== before) {
     const u = undo.get(uid) || []; u.push(before); if (u.length > UNDO_STEPS) u.shift(); undo.set(uid, u);
     saveDb();
+    sweepReceipts(uid);   // photos of charges that are gone, once Undo can't bring them back
     nudge(uid, status).catch(() => {});
   }
   return { msg };
@@ -237,8 +240,11 @@ const edited = t => !!(t.set || t.note || t.tags || t.split || t.sentTo || t.hid
 async function syncItem(itemId) {
   const it = db.items[itemId]; if (!it) return { added: 0 };
   const s = stateOf(it.uid), token = plaid.open(it.token);
+  // Disconnected (or a backup restored) while Plaid was answering: what it said is about a connection that's gone
+  const gone = () => db.items[itemId] !== it;
   try {
     const ac = await plaid.accounts(token);
+    if (gone()) return { added: 0 };
     for (const a of ac.accounts || []) {
       const id = 'p_' + a.account_id, type = plaidAcctType(a);
       let x = s.accounts.find(y => y.id === id) || carryOn(s, it, a, id, type);
@@ -262,8 +268,10 @@ async function syncItem(itemId) {
         for (const a of ac.accounts) if (a.type === 'investment') { const x = s.accounts.find(y => y.id === 'p_' + a.account_id); if (x) x.holdings = B.plaidHoldings(hr, a.account_id); }
       } catch (e) { if (e.code === 'NETWORK' || plaid.needsLogin(e.code)) throw e; }
     }
+    if (gone()) return { added: 0 };
     const before = B.budgetStatus(s, B.ymOf(today()), today());
     const r = await plaid.sync(token, it.cursor);
+    if (gone()) return { added: 0 };
     const byPlaid = new Map(s.txns.filter(t => t.plaidId).map(t => [t.plaidId, t]));
     // The charges a carried-on account already had. The bank sends them again with new ids: match on the day, the
     // amount and the name (or the only one with that day and amount), so the person's changes stay and nothing doubles.
@@ -303,10 +311,18 @@ async function syncItem(itemId) {
         s.txns.push(t); byPlaid.set(p.transaction_id, t); added++;
       }
     }
-    const gone = new Set(r.removed.map(x => x.transaction_id));
-    if (gone.size) s.txns = s.txns.filter(t => !t.plaidId || !gone.has(t.plaidId) || t.splitOf);
+    // Charges the bank took back (a pending one that never posted) go, with the part split off them. The other side of a
+    // transfer they matched stops being one, and gets a category again if the person didn't pick one.
+    const removed = new Set(r.removed.map(x => x.transaction_id)), drop = new Set(s.txns.filter(t => t.plaidId && removed.has(t.plaidId)).map(t => t.id));
+    if (drop.size) {
+      s.txns = s.txns.filter(t => !drop.has(t.id) && !drop.has(t.splitOf));
+      for (const t of s.txns) if (t.pair && drop.has(t.pair)) { delete t.pair; if (!t.set) t.c = B.pickCat(s, t.m, t.a > 0 ? 'income' : null); }
+    }
+    // Undo holds copies of the budget from before this: going back to one would lose what the bank just sent for good
+    if (r.added.length || r.modified.length || drop.size) undo.delete(it.uid);
     // Bills Plaid found, kept per bank and put together for the person
     try { it.bills = B.plaidBills(await plaid.recurring(token)); } catch (e) { if (e.code === 'NETWORK') throw e; }
+    if (gone()) return { added };
     s.plaidBills = Object.values(db.items).filter(x => x.uid === it.uid).flatMap(x => x.bills || []);
     it.cursor = r.cursor; it.error = null; it.syncedAt = Date.now(); delete it.loginTold;
     for (const x of s.accounts) if (carried.has(x.id)) delete x.carry;
@@ -344,6 +360,7 @@ async function removeItem(uid, itemId) {
   s.txns = s.txns.filter(t => !(ids.has(t.acct) && t.pending && !edited(t)));
   delete db.items[itemId];
   s.plaidBills = Object.values(db.items).filter(x => x.uid === uid).flatMap(x => x.bills || []);
+  undo.delete(uid);   // an Undo from before would bring back accounts that look connected to a bank that isn't
   saveDb();
 }
 
@@ -437,23 +454,29 @@ async function weeklyCheckIn() {
   const now = new Date(); if (now.getDay() !== 0 || now.getHours() < 18) return;
   const t = today();
   for (const [uid, s] of Object.entries(db.people)) {
-    if (!pushes.subs[uid]?.length || s.weeklyOn === t || !s.txns.length) continue;
-    s.weeklyOn = t; saveDb(); B.useCats(s);
-    const w = B.week(s, t); if (!w.spent && !w.usual) continue;
-    const diff = w.usual == null ? null : w.spent - w.usual;
-    await notify(uid, { title: `You spent $${w.spent.toFixed(0)} this week`, tag: 'weekly',
-      body: diff == null ? 'Everyday spending, leaving out home & bills.' : Math.abs(diff) < 10 ? 'About the same as a usual week.' : `$${Math.abs(diff).toFixed(0)} ${diff < 0 ? 'less' : 'more'} than a usual week.` });
+    if (!pushes.subs[uid]?.length || s.weeklyOn === t || !s.txns?.length) continue;
+    s.weeklyOn = t; saveDb();
+    try {   // one budget that can't be worked out never keeps the others from theirs
+      B.useCats(s);
+      const w = B.week(s, t); if (!w.spent && !w.usual) continue;
+      const diff = w.usual == null ? null : w.spent - w.usual;
+      await notify(uid, { title: `You spent $${w.spent.toFixed(0)} this week`, tag: 'weekly',
+        body: diff == null ? 'Everyday spending, leaving out home & bills.' : Math.abs(diff) < 10 ? 'About the same as a usual week.' : `$${Math.abs(diff).toFixed(0)} ${diff < 0 ? 'less' : 'more'} than a usual week.` });
+    } catch (e) { console.error('Weekly check-in:', e.message); }
   }
 }
 // The evening before a bill is due.
 async function billReminders() {
-  const t = today(), tomorrow = B.ymd(new Date(Date.now() + 864e5)), h = new Date().getHours();
+  // Tomorrow from today's date, not 24 hours from now: the evening before the clocks spring forward is only 23 hours long
+  const t = today(), tomorrow = B.ymd(new Date(new Date(t + 'T12:00:00').getTime() + 864e5)), h = new Date().getHours();
   if (h < 18) return;
   for (const [uid, s] of Object.entries(db.people)) {
     if (!pushes.subs[uid]?.length || s.remindedOn === t) continue;
-    const due = B.upcoming(s, t).filter(b => !b.paid && b.due === tomorrow);
     s.remindedOn = t; saveDb();
-    if (due.length) await notify(uid, { title: due.length === 1 ? `${due[0].n} is due tomorrow` : `${due.length} bills due tomorrow`, body: due.map(b => `${b.n} $${b.a.toFixed(2)}`).join(', '), tag: 'bills' });
+    try {   // one budget that can't be worked out never keeps the others from their reminders
+      const due = B.dueOn(s, t, tomorrow);
+      if (due.length) await notify(uid, { title: due.length === 1 ? `${due[0].n} is due tomorrow` : `${due.length} bills due tomorrow`, body: due.map(b => `${b.n} $${b.a.toFixed(2)}`).join(', '), tag: 'bills' });
+    } catch (e) { console.error('Bill reminders:', e.message); }
   }
 }
 
@@ -493,8 +516,9 @@ function backup() {
   copyOut();
 }
 // The copy that survives this laptop's disk: today's full backup in BACKUP_COPY_DIR, if it isn't there yet.
-// Without BACKUP_PASSPHRASE the copy isn't locked, so it leaves out secret.key while there are bank connections:
-// whoever finds the drive gets the budgets, but not a way into anyone's bank. Restoring it on this laptop still works.
+// Without BACKUP_PASSPHRASE the copy isn't locked, so it leaves out secret.key: whoever finds the drive gets the
+// budgets, but not a way into anyone's bank. Always, not only while banks are connected: the same key seals every
+// bank connected later, so an old copy with it would open the newer ones. Restoring it on this laptop still works.
 const copyState = { at: null, error: null, note: null };
 const copyName = day => `budget-it-backup-${day}.${BACKUP_PASSPHRASE ? 'locked' : 'zip'}`;
 const sealedCount = (d = db) => Object.keys(d.items || {}).length + Object.keys(d.splitit || {}).length;
@@ -505,8 +529,8 @@ function copyOut(force) {
     fs.mkdirSync(BACKUP_COPY_DIR, { recursive: true });
     const mine = () => fs.readdirSync(BACKUP_COPY_DIR).filter(f => /^budget-it-backup-\d{4}-\d\d-\d\d\.(zip|locked)$/.test(f)).sort();
     const file = path.join(BACKUP_COPY_DIR, copyName(B.ymd(new Date())));
-    const noKey = !BACKUP_PASSPHRASE && sealedCount() > 0;
-    copyState.note = noKey ? NO_KEY_NOTE : null;
+    const noKey = !BACKUP_PASSPHRASE;
+    copyState.note = noKey && sealedCount() > 0 ? NO_KEY_NOTE : null;
     if (force || !fs.existsSync(file)) writeBackupFile(file, BACKUP_PASSPHRASE, { noKey });
     const all = mine(); for (const f of all.slice(0, Math.max(0, all.length - KEEP_COPIES))) fs.unlinkSync(path.join(BACKUP_COPY_DIR, f));
     copyState.at = fs.statSync(path.join(BACKUP_COPY_DIR, mine().pop())).mtimeMs; copyState.error = null;
@@ -536,7 +560,14 @@ function unlock(buf, pass) {
   try { return Buffer.concat([d.update(buf.subarray(o + 44)), d.final()]); } catch { throw new Error('That passphrase doesn’t open this backup.'); }
 }
 // Receipt photos never change (a new photo gets a new name), so each one is copied into backups/receipts once.
-// Photos no charge points to any more (the charge was deleted) are removed after two days, which leaves time for Undo.
+// Photos no charge points to any more (removed, or the charge or its account deleted) go once Undo can't bring them back.
+const heldByUndo = f => [...undo.values()].some(list => list.some(x => x.includes(f)));
+function sweepReceipts(uid) {   // one person's, right after a change of theirs
+  let names; try { names = fs.readdirSync(RECEIPT_DIR).filter(f => f.startsWith(uid + '_')); } catch { return; }
+  if (!names.length) return;
+  const now = JSON.stringify(db.people[uid]?.txns || []);
+  for (const f of names) if (!now.includes(f) && !heldByUndo(f)) try { fs.rmSync(path.join(RECEIPT_DIR, f), { force: true }); } catch {}
+}
 function receiptsBackup() {
   let names; try { names = fs.readdirSync(RECEIPT_DIR); } catch { return; }
   const keep = new Set(); for (const s of Object.values(db.people)) for (const t of s.txns || []) if (t.receipt && !String(t.receipt).startsWith('data:')) keep.add(path.basename(t.receipt));
@@ -545,7 +576,7 @@ function receiptsBackup() {
     const fp = path.join(RECEIPT_DIR, f);
     try {
       if (keep.has(f)) { if (!fs.existsSync(path.join(dir, f))) fs.copyFileSync(fp, path.join(dir, f)); }
-      else if (Date.now() - fs.statSync(fp).mtimeMs > 2 * 864e5) fs.rmSync(fp, { force: true });
+      else if (!heldByUndo(f) && Date.now() - fs.statSync(fp).mtimeMs > 10 * 60e3) fs.rmSync(fp, { force: true });
     } catch {}
   }
 }
@@ -572,17 +603,31 @@ function zipStream(entries, write) {
   write(cd); write(end);
 }
 function zipWrite(entries) { const parts = []; zipStream(entries, b => parts.push(b)); return Buffer.concat(parts); }
-function zipRead(buf) {   // -> { name: Buffer }, understands stored and deflated entries
+// Unpacked, a backup may come to at most `max` bytes (a few hundred MB of receipt photos is plenty), so a small
+// file that inflates to gigabytes can't take the laptop's memory. A cut-off zip says it's damaged.
+function zipRead(buf, max = 2e9) {   // -> { name: Buffer }, understands stored and deflated entries
+  try { return zipEntries(buf, max); } catch (e) {
+    if (e.code === 'ERR_BUFFER_TOO_LARGE') throw new Error('That backup unpacks too big, so it wasn’t read.');
+    if (e instanceof RangeError) throw new Error('That zip is damaged.');
+    throw e;
+  }
+}
+function zipEntries(buf, max) {
   let e = buf.length - 22; while (e >= 0 && buf.readUInt32LE(e) !== 0x06054b50) e--;
   if (e < 0) throw new Error('That file isn’t a zip.');
   const n = buf.readUInt16LE(e + 10); let o = buf.readUInt32LE(e + 16); const outp = {};
+  let left = max;
   for (let i = 0; i < n; i++) {
     if (buf.readUInt32LE(o) !== 0x02014b50) throw new Error('That zip is damaged.');
     const method = buf.readUInt16LE(o + 10), csize = buf.readUInt32LE(o + 20), nlen = buf.readUInt16LE(o + 28), xlen = buf.readUInt16LE(o + 30), clen = buf.readUInt16LE(o + 32), lo = buf.readUInt32LE(o + 42);
     const name = buf.subarray(o + 46, o + 46 + nlen).toString('utf8');
     const ds = lo + 30 + buf.readUInt16LE(lo + 26) + buf.readUInt16LE(lo + 28), raw = buf.subarray(ds, ds + csize);
     if (method !== 0 && method !== 8) throw new Error('That zip uses a kind of compression this can’t read.');
-    if (!name.endsWith('/')) outp[name] = method === 8 ? zlib.inflateRawSync(raw) : Buffer.from(raw);
+    if (raw.length < csize) throw new Error('That zip is damaged.');
+    if (!name.endsWith('/')) {
+      if (left <= 0 || (method === 0 && raw.length > left)) throw new Error('That backup unpacks too big, so it wasn’t read.');
+      outp[name] = method === 8 ? zlib.inflateRawSync(raw, { maxOutputLength: left }) : Buffer.from(raw); left -= outp[name].length;
+    }
     o += 46 + nlen + xlen + clen;
   }
   return outp;
@@ -621,11 +666,12 @@ function restoreBackup(buf, pass) {
   flushDb(); if (dbDirty && diskState.error) throw new Error(diskState.error);
   for (const f of ['db.json', 'users.json', 'push.json', 'secret.key']) { const fp = path.join(DATA_DIR, f); if (fs.existsSync(fp)) fs.copyFileSync(fp, path.join(BACKUP_DIR, `before-restore-${stamp}-${f}`)); }
   if (files['secret.key']) { fs.writeFileSync(path.join(DATA_DIR, 'secret.key'), files['secret.key'], { mode: 0o600 }); plaid.forgetKey(); }
-  db = next; db.people = db.people || {}; db.items = db.items || {}; dbDirty = true; flushDb(); undo.clear();
+  db = next; db.people = db.people || {}; db.items = db.items || {}; dbDirty = true; undo.clear();
   // Sessions are not restored: the ones signed out since the backup stay signed out, and current ones keep working if that person is still there.
   if (nextUsers) { const now = users.sessions || {}; users = nextUsers; users.sessions = {}; users.sessionsHashed = true;
     for (const [t, x] of Object.entries(now)) if (users.users[x.uid]) users.sessions[t] = x;
     saveUsers(); }
+  migrateShares(); flushDb();   // a backup from before 1.1 can share an account with "everyone": that's the people who are here now
   if (nextPush) { pushes = nextPush; pushes.subs = pushes.subs || {}; savePushes(); }
   if (files['push-keys.json']) { try { const k = JSON.parse(files['push-keys.json'].toString('utf8')); if (k.publicKey && k.privateJwk) { fs.writeFileSync(PUSH_KEYS_FILE, files['push-keys.json'], { mode: 0o600 }); pushKeys = push.loadKeys(PUSH_KEYS_FILE); } } catch {} }
   if (files['oauth.json']) fs.writeFileSync(path.join(DATA_DIR, 'oauth.json'), files['oauth.json'], { mode: 0o600 });
@@ -708,7 +754,7 @@ const subnets = list => { const b = new net.BlockList(); for (const x of list) {
 const PRIVATE_NETS = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.0/8', '::1/128', 'fc00::/7', 'fe80::/10'];
 const TRUSTED_PROXY = (process.env.TRUSTED_PROXY || '').trim();
 const PROXIES = subnets(TRUSTED_PROXY.toLowerCase() === 'none' ? [] : PRIVATE_NETS.concat(TRUSTED_PROXY.split(',').map(x => x.trim()).filter(x => {
-  const [a, n] = x.split('/'), ok = !!net.isIP(a) && (n === undefined || /^\d{1,3}$/.test(n)); if (x && !ok) console.error(`TRUSTED_PROXY: ${x} isn’t an address, so it’s ignored.`); return ok; })));
+  const [a, n] = x.split('/'), ok = !!net.isIP(a) && (n === undefined || (/^\d{1,3}$/.test(n) && +n <= (net.isIP(a) === 6 ? 128 : 32))); if (x && !ok) console.error(`TRUSTED_PROXY: ${x} isn’t an address, so it’s ignored.`); return ok; })));
 // Also never called on the laptop's behalf (Split it): link-local (cloud metadata), shared and "this network" addresses too.
 const INTERNAL = subnets(PRIVATE_NETS.concat(['0.0.0.0/8', '169.254.0.0/16', '100.64.0.0/10', '192.0.0.0/24', '198.18.0.0/15', '224.0.0.0/3', '::/128', '::ffff:0:0/96', '64:ff9b::/96', 'fec0::/10', 'ff00::/8']));
 const internalIp = a => inList(INTERNAL, a);
@@ -732,18 +778,24 @@ function otherSite(req) {
   const mine = [req.headers['x-forwarded-host'], req.headers.host].map(x => String(x || '').split(',')[0].trim().toLowerCase().replace(/:(80|443)$/, ''));
   return !mine.includes(h) && h !== hostOf(process.env.PUBLIC_URL || '');
 }
+// What the limits count by: the address, or for IPv6 its /64, since one home or server gets a whole /64 and
+// could otherwise take a fresh address for every guess.
+const ipKey = a => { if (net.isIP(a) !== 6 || a.includes('.')) return a;
+  const [l, r] = a.toLowerCase().split('::'), L = l ? l.split(':') : [], R = r ? r.split(':') : [];
+  return [...L, ...Array(Math.max(0, 8 - L.length - R.length)).fill('0'), ...R].slice(0, 4).map(x => parseInt(x, 16).toString(16)).join(':') + '::/64'; };
+const clientKey = req => ipKey(clientIp(req));
 // Slow down guessing: 5 misses from one address, then a 15 minute wait.
 const recent = k => { const m = misses.get(k); return m && Date.now() - m.at < 15 * 60e3 ? m.n : 0; };
 const bump = k => { misses.set(k, { n: recent(k) + 1, at: Date.now() }); if (misses.size > 5000) for (const [key, m] of misses) if (Date.now() - m.at > 15 * 60e3) misses.delete(key); };
-const noteMiss = (req, uid) => { bump(clientIp(req)); if (uid) bump('acct:' + uid); };
+const noteMiss = (req, uid) => { bump(clientKey(req)); if (uid) bump('acct:' + uid); };
 // Only the address is ever locked out. Misses aimed at one account (from anywhere) slow that account down instead,
 // so guessing from many addresses stays slow but nobody can keep a housemate out by typing their name.
-const tooManyTries = req => recent(clientIp(req)) >= 5 ? 'Too many tries. Wait 15 minutes.' : null;
+const tooManyTries = req => recent(clientKey(req)) >= 5 ? 'Too many tries. Wait 15 minutes.' : null;
 const slowFor = uid => { const n = uid ? recent('acct:' + uid) : 0; return n < 10 ? 0 : Math.min(10e3, 1000 * 2 ** (n - 10)); };
 const slowDown = uid => { const ms = slowFor(uid); return ms ? new Promise(r => setTimeout(r, ms)) : null; };
 async function checkLogin(req, name, password) {   // returns the uid, or null (and counts the miss)
   const found = findUser(name || '');
-  if (found && !tooManyTries(req)) { await slowDown(found[0]); if (checkPw(String(password || ''), found[1])) { misses.delete(clientIp(req)); return found[0]; } }
+  if (found && !tooManyTries(req)) { await slowDown(found[0]); if (checkPw(String(password || ''), found[1])) { misses.delete(clientKey(req)); return found[0]; } }
   noteMiss(req, found && found[0]);
   return null;
 }
@@ -768,6 +820,7 @@ function removeUser(id) {
   for (const o of Object.values(db.people)) for (const a of o.accounts || []) if (Array.isArray(a.shared)) a.shared = a.shared.filter(x => x !== id);
   for (const k of Object.keys(friendDocs())) if (k.startsWith(`data/users/${id}/`) || k.endsWith('/friends/' + id)) delete db.friends[k];
   if (users.friendReqs) { for (const [k, r] of Object.entries(users.friendReqs)) if (r.from === id || r.to === id) delete users.friendReqs[k]; saveUsers(); }
+  if (users.invites) { for (const [k, v] of Object.entries(users.invites)) if (v.by === id && !v.used) delete users.invites[k]; saveUsers(); }   // nobody joins through someone who's gone
   try { for (const f of fs.readdirSync(RECEIPT_DIR)) if (f.startsWith(id + '_')) fs.rmSync(path.join(RECEIPT_DIR, f), { force: true }); } catch {}
   delete db.people[id]; undo.delete(id); saveDb();   // undo keeps copies of the budget in memory: those go too
   return true;
@@ -815,7 +868,7 @@ function file(res, name, type, cache, dir) {
 const PUBLIC_FILES = new Set(['/manifest.webmanifest', '/sw.js', '/qr.js', '/icon.svg', '/icon-192.png', '/icon-512.png', '/icon-maskable-512.png', '/apple-touch-icon.png']);
 
 // ---------- the assistant connector and accounts ----------
-const mcp = require('./mcp')({ DATA_DIR, users: () => users, findUser, checkLogin, tooManyTries, noteMiss, secure, B, sessionUid, clientIp,
+const mcp = require('./mcp')({ DATA_DIR, users: () => users, findUser, checkLogin, tooManyTries, noteMiss, secure, B, sessionUid, clientIp, clientKey,
   stateOf, applyOp, today, nameFor, plaidSync: uid => syncAll(uid), version: VERSION,
   needsCode: uid => accounts.needsCode(uid), checkCode: (uid, code) => accounts.checkCode(uid, code) });
 // Friends (made by invite links, @tag requests and friend links) live in db.friends, keyed the way accounts.js
@@ -851,7 +904,8 @@ async function latestRelease() {
     const r = await fetch(RELEASES_URL, { headers: { 'User-Agent': 'budget-it', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(6000) });
     const d = r.ok ? await r.json() : null;
     if (d && /^v?\d+\.\d+\.\d+$/.test(d.tag_name || '')) release.data = { current: VERSION, latest: String(d.tag_name).replace(/^v/, ''), newer: newerThan(d.tag_name, VERSION),
-      url: /^https:\/\/github\.com\//.test(d.html_url || '') ? d.html_url : null, name: String(d.name || '').slice(0, 120) };
+      url: /^https:\/\/github\.com\//.test(d.html_url || '') ? d.html_url : null, name: String(d.name || '').slice(0, 120),
+      security: /\bsecurity\b/i.test(`${d.name || ''}\n${d.body || ''}`) };   // a release that fixes a security problem says so
   } catch {}
   return release.data;
 }
@@ -962,7 +1016,7 @@ async function handle(req, res) {
     }
     if (m !== 'POST') return send(res, 404, { error: 'not found' });
     const { id, owner, name } = await readBody(req);
-    if (!users.users[id]) return send(res, 404, { error: 'No such person.' });
+    if (typeof id !== 'string' || !Object.hasOwn(users.users, id)) return send(res, 404, { error: 'No such person.' });   // never __proto__
     if (p === '/api/admin/reset-link') return send(res, 200, { url: accounts.resetLink(req, id), name: users.users[id].name });
     if (p === '/api/admin/signout') return send(res, 200, { ok: true, sessions: endSessions(id, { assistants: true }) });
     if (p === '/api/admin/code-off') return send(res, 200, { ok: true, was: accounts.codeOff(id) });
@@ -1018,7 +1072,7 @@ async function handle(req, res) {
     const { id, data } = await readBody(req, 6e6);
     if (!data) {   // remove the photo
       const t = stateOf(uid).txns.find(x => x.id === id && !x.other); if (!t) return send(res, 404, { error: 'That transaction isn’t there any more.' });
-      if (t.receipt && !t.receipt.startsWith('data:')) fs.rmSync(path.join(RECEIPT_DIR, path.basename(t.receipt)), { force: true });
+      // The photo itself goes once Undo can't bring it back (see sweepReceipts)
       const r = applyOp(uid, 'txn.receipt', { id, receipt: '' }, true); return send(res, 200, { ok: true, msg: r.msg, ...viewFor(uid) });
     }
     const mm = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(data || ''));
@@ -1027,7 +1081,6 @@ async function handle(req, res) {
     const name = `${uid}_${crypto.randomBytes(9).toString('hex')}.${mm[1] === 'jpeg' ? 'jpg' : mm[1]}`;
     try { fs.mkdirSync(RECEIPT_DIR, { recursive: true }); fs.writeFileSync(path.join(RECEIPT_DIR, name), Buffer.from(mm[2], 'base64'), { mode: 0o600 }); }
     catch (e) { try { fs.rmSync(path.join(RECEIPT_DIR, name), { force: true }); } catch {} noteDisk(e, 'a receipt photo'); return send(res, 507, { error: diskMsg(e) }); }
-    if (t.receipt && !t.receipt.startsWith('data:')) fs.rmSync(path.join(RECEIPT_DIR, path.basename(t.receipt)), { force: true });
     const r = applyOp(uid, 'txn.receipt', { id, receipt: name }, true);
     durable();
     return send(res, 200, { ok: true, msg: r.msg, ...viewFor(uid) });
@@ -1247,7 +1300,7 @@ function localCommand({ cmd, name, password }) {
   if (cmd === 'sample') {
     const s = stateOf(id);
     if (s.txns.length) return { text: `${u.name} already has transactions, so nothing was changed.` };
-    db.people[id] = { ...blank(), ...sample(today()) }; saveDb(); changed([id]);
+    db.people[id] = { ...blank(), ...ownSample(today()) }; saveDb(); changed([id]);
     return { text: `Filled ${u.name}'s budget with sample data. Remove it later in the app: Settings, Remove sample data.` };
   }
   return { text: 'Unknown command.' };
@@ -1300,12 +1353,12 @@ if (require.main === module) {
     setInterval(() => billReminders().catch(e => console.error('Bill reminders:', e.message)), 15 * 60e3);
     setInterval(() => weeklyCheckIn().catch(e => console.error('Weekly check-in:', e.message)), 15 * 60e3);
     if (plaid.configured) setInterval(() => syncAll().then(r => r.errors.length && console.error('Bank sync:', r.errors.join(' '))).catch(e => console.error('Bank sync:', e.message)), SYNC_HOURS * 3600e3);
-    http.createServer((req, res) => handle(req, res).catch(e => {
+    http.createServer((req, res) => handle(req, res).catch(e => {   // the log gets the path only, never a ?key=
       if (!e.status) console.error(e);
-      if (!res.headersSent) { if (DISK_CODES.has(e.code)) { noteDisk(e, req.url); return send(res, 507, { error: diskMsg(e) }); }
+      if (!res.headersSent) { if (DISK_CODES.has(e.code)) { noteDisk(e, String(req.url).split('?')[0]); return send(res, 507, { error: diskMsg(e) }); }
         send(res, e.status || (e.code ? 502 : 500), { error: e.status || e.code ? e.message : 'Something went wrong on the laptop. Try again.' }); }
     })).on('error', e => { console.error(e.code === 'EADDRINUSE' ? `Port ${PORT} is already in use. Is Budget it already running? Stop it, or set PORT to another number.` : 'Couldn’t start: ' + e.message); process.exit(1); })
       .listen(PORT, HOST, () => console.log(`Budget it ${VERSION} running at http://${HOST}:${PORT}`));
   }
 }
-module.exports = { OPS, applyOp, viewFor, syncAll, connectItem, removeItem, _db: () => db, zipWrite, zipRead, lock, unlock, isLocked, newerThan, myShareFrom };
+module.exports = { OPS, applyOp, viewFor, syncAll, connectItem, removeItem, _db: () => db, zipWrite, zipRead, lock, unlock, isLocked, newerThan, myShareFrom, handle, restoreBackup, latestRelease, receiptsBackup };

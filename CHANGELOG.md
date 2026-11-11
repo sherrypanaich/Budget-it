@@ -24,6 +24,7 @@
 - Extra safety copies of your budgets: one at every start (so every update has one) and one every 6 hours, on top of the daily and weekly ones.
 - If the budgets file was damaged at start, whoever runs Budget it sees which copy was used and its date, until they dismiss it.
 - Restore also takes a plain `db-….json` copy from `data/backups`.
+- The owner's update check marks a security release with a red "Security update".
 
 ### Improved
 - New bank connections ask for up to two years of history (was 180 days). Only the last 14 days land in "New from your bank".
@@ -41,6 +42,13 @@
 - The README has a new "Running behind a proxy (Coolify, Traefik, Cloudflare tunnel)" section and a "Restoring a backup from the terminal" section for files over Cloudflare's 100 MB upload limit.
 - New settings: `TZ` (reminders and "today" follow it; the Docker image now includes time zones), `TRUSTED_PROXY`, and `SPLIT_IT_URL`.
 - The website and README say what it costs to run: about $70 a month for Budget it and Split it together, and linking bank accounts costs extra on top of that.
+- A disconnected bank's account still counts in net worth but shows "last known", and is left out of safe to spend and the low-chequing heads-up.
+- Removing or replacing a receipt photo can be undone; the photo file goes once Undo can't bring it back.
+- Keyboard use: focus rings on search, quick add, amount boxes and the sign-in and join pages; the receipt button works with a keyboard; Tab inside a sheet reaches every toggle and text box.
+- The Accounts page names the same assistants as Settings and has a Set up button, and a bank that needs signing in again says so in full.
+- Picking several charges reads "Tag 3 charges" and "Move 3 charges to", the search box hint is shorter, and quotes and apostrophes are curly throughout.
+- When the laptop can't be reached, sheets say "Couldn't reach the laptop. Check your connection and try again." instead of "Failed to fetch".
+- Removing a receipt photo, and signing someone out on the owner's page, take a second tap.
 
 ### Fixed
 - Behind a proxy (Coolify, Traefik, a Cloudflare tunnel), five wrong passwords from anyone locked everyone out of signing in for 15 minutes. Each visitor now has their own limit.
@@ -50,6 +58,26 @@
 - A full or failing disk no longer stops the app. The change that couldn't be saved says so, it's retried, and the owner sees a warning.
 - Restore checks every file before replacing anything, so a wrong file can't break the app.
 - A test that hung now and then is fixed.
+- CSV import: two identical charges in one file both come in, and importing the same file again still adds nothing.
+- CSV import: impossible dates and amounts are skipped instead of saved broken, and "25/12/2026" is read as day/month.
+- Amounts of a billion or more are refused everywhere you type an amount, and cash with a date that doesn't exist uses today.
+- A bill charged on the 31st one month and the 1st the next is found as a bill, and bills due on the 1st (like rent) get their evening reminder.
+- "Tomorrow" for reminders is right on the evening before the clocks change.
+- When the bank takes back a charge you had split, the split-off part goes too, and a broken transfer gets its category back.
+- Undo after a bank update or a disconnect can no longer bring back an older budget and lose charges.
+- Disconnecting a bank while it was updating can't reconnect its accounts.
+- Removing one of your own categories moves your bills in it too.
+- Deleting an account a goal followed keeps the goal's saved amount in home money.
+- Changing your home currency converts each account's past charges too.
+- Sample data is no longer shared with everyone on the laptop.
+- Restoring a backup from before 1.1 turns "shared with everyone" into the people who are here.
+- One person's budget that can't be worked out no longer stops everyone else's reminders.
+- A mistyped range in `TRUSTED_PROXY` is skipped instead of stopping Budget it from starting.
+- Broken sign-in requests from an assistant get a clear refusal instead of an error.
+- An assistant can add the same cash purchase twice on purpose when you really bought it twice.
+- Invite links end when the person who sent them deletes their account.
+- A damaged or oversized backup is refused with a plain message.
+- Activity no longer scrolls sideways on a phone, the guide's speech bubble no longer covers its face on a laptop, and month names in a category's trend are no longer cut off.
 
 ### Security
 - Changes sent to Budget it from another website are refused.
@@ -63,10 +91,17 @@
 - CSV exports can't carry spreadsheet formulas.
 - A shared account was visible to every login on the laptop. Now only the people you picked see it.
 - The README and website say exactly who sees what: Plaid sees the bank data it fetches, a connected assistant sees what it asks for, Cloudflare carries the traffic if you use a tunnel, and whoever runs the laptop can read everything.
+- Backup copies that aren't locked with a passphrase never include the bank key, even from before a bank was connected.
+- Wrong-password and sign-up limits count a whole IPv6 network as one visitor, so hopping addresses doesn't get around them.
+- The assistant sign-in page never sends you on to another site before you've seen where it goes.
+- Tighter limits on what an assistant app can register, and at most 50 calls in one batch.
+- `data/oauth.json` is readable only by the laptop's user, and a `?key=` in an assistant's link never ends up in the log.
+- Person ids like `__proto__` are refused on the owner's page and when sharing an account.
+- Friend requests and friend links notify someone at most once an hour.
 
 ### Known issues
 - Anyone using a Split it on the same laptop (like `http://localhost:8080`) needs to add `SPLIT_IT_URL` to `budget-it.env` and restart; the error message says what to add.
-- A disconnected bank's last balance still counts in net worth.
+- A disconnected bank's balance is its last known one until you reconnect it.
 
 ## v1.0.0 · November 9, 2026
 

@@ -23,6 +23,8 @@ button,.btn{display:flex;align-items:center;justify-content:center;gap:10px;widt
 .btn.alt{background:var(--surface);color:var(--ink)}
 .or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.85rem;margin:18px 0 0}.or::before,.or::after{content:"";flex:1;height:1.5px;background:var(--edge);opacity:.35}
 button:disabled{opacity:.6;cursor:default}
+button:focus-visible,a:focus-visible{outline:3px solid #2a78d6;outline-offset:2px}
+@media (prefers-color-scheme:dark){button:focus-visible,a:focus-visible{outline-color:#6fa8ef}}
 .err{color:var(--owe);margin:12px 0 0;min-height:1.2em}
 .by{margin:-8px 0 14px;font-weight:700;font-size:.8rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .hint{font-size:.82rem;margin:6px 0 0}

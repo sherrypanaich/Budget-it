@@ -196,7 +196,8 @@
   // What's free until the next payday: money in chequing, minus what you owe on cards, minus bills due before then.
   function safeToSpend(st, today) {
     const p = payday(st, today); if (!p) return null;
-    const own = (st.accounts || []).filter(a => !a.other && !a.csv);
+    // A disconnected bank's balance is only what it was the day it was disconnected, so it isn't counted here
+    const own = (st.accounts || []).filter(a => !a.other && !a.csv && !a.disconnected);
     const cash = round2(own.filter(a => a.type === 'Chequing').reduce((s, a) => s + inHome(st, a), 0));
     const cards = round2(own.filter(a => a.type === 'Credit card').reduce((s, a) => s + Math.min(0, inHome(st, a)), 0));
     const due = upcoming(st, today).filter(b => !b.late && b.due >= today && b.due < p.next && !(b.paid && ymOf(b.due) === ymOf(today)));
@@ -233,11 +234,16 @@
   }
   function toDate(s) {
     s = String(s || '').trim();
-    let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/); if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
-    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); if (m) return `${m[3]}-${pad(m[1])}-${pad(m[2])}`;   // MM/DD/YYYY, as most Canadian bank exports use
-    const d = new Date(s); return isNaN(d) ? null : ymd(d);
+    // Only a day that really is one: "2026-02-30" or a 13th month isn't a date, rather than a row no month ever shows
+    const day = (y, mo, d) => { y = +y; mo = +mo; d = +d; return y >= 1900 && y <= 2200 && mo >= 1 && mo <= 12 && d >= 1 && d <= daysIn(`${y}-${pad(mo)}`) ? `${y}-${pad(mo)}-${pad(d)}` : null; };
+    let m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/); if (m) return day(m[1], m[2], m[3]);
+    // MM/DD/YYYY, as most Canadian bank exports use. DD/MM/YYYY when the first number can't be a month (25/12/2026).
+    m = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})(?:\s|$)/); if (m) return +m[1] > 12 ? day(m[3], m[2], m[1]) : day(m[3], m[1], m[2]);
+    if (!/[a-z]{3}/i.test(s)) return null;   // past here only dates with a month name ("Nov 5, 2026"): "5" or "45231" isn't one
+    const d = new Date(s); return isNaN(d) || d.getFullYear() < 1900 || d.getFullYear() > 2200 ? null : ymd(d);
   }
-  const toNum = s => { s = String(s || '').replace(/[$\s]/g, ''); if (!s) return null; const neg = /^\(.*\)$/.test(s) || /-$/.test(s); s = s.replace(/[()]/g, '').replace(/-$/, '').replace(/,/g, ''); const n = parseFloat(s); return isNaN(n) ? null : (neg ? -n : n); };
+  // Amounts of a billion or more aren't money anyone imports ("1e999" would even be Infinity, then null once saved)
+  const toNum = s => { s = String(s || '').replace(/[$\s]/g, ''); if (!s) return null; const neg = /^\(.*\)$/.test(s) || /-$/.test(s); s = s.replace(/[()]/g, '').replace(/-$/, '').replace(/,/g, ''); const n = parseFloat(s); return !Number.isFinite(n) || Math.abs(n) >= 1e9 ? null : (neg ? -n : n); };
   // Understands: date,description,amount   or   a header row with Date / Description / Amount, or Debit + Credit columns.
   function parseCsv(text) {
     const rows = csvRows(text); if (!rows.length) return [];
@@ -283,13 +289,17 @@
       for (const t of list) { const ym = ymOf(t.date); if (!months.has(ym)) months.set(ym, t); }
       if (months.size < 2) continue;
       const ts = [...months.values()].sort((a, b) => a.date.localeCompare(b.date));
-      const last = ts[ts.length - 1], amts = ts.map(t => -t.a), days = ts.map(t => dayOf(t.date));
+      const last = ts[ts.length - 1], amts = ts.map(t => -t.a);
+      let days = ts.map(t => dayOf(t.date));
       const avg = amts.reduce((s, a) => s + a, 0) / amts.length;
       if (amts.some(a => Math.abs(a - avg) > avg * 0.25)) continue;
+      // Rent on the 31st one month and the 1st the next (weekends, short months) is still about the same day
+      if (Math.max(...days) - Math.min(...days) > 5) days = days.map(x => x <= 5 ? x + 31 : x);
       if (Math.max(...days) - Math.min(...days) > 5) continue;
       if (monthsBetween(ymOf(last.date), ymOf(today)) > 1) continue;   // stopped
       const varies = amts.some(a => Math.abs(a - amts[0]) > 0.009);
-      out.push({ m: baseName(last.m), key: k, n: baseName(last.m), a: round2(varies ? avg : -last.a), d: Math.round(days.reduce((s, x) => s + x, 0) / days.length), acct: last.acct, c: last.c, varies, sub: SUBS.test(last.m) });
+      const d = Math.round(days.reduce((s, x) => s + x, 0) / days.length);
+      out.push({ m: baseName(last.m), key: k, n: baseName(last.m), a: round2(varies ? avg : -last.a), d: d > 31 ? d - 31 : d, acct: last.acct, c: last.c, varies, sub: SUBS.test(last.m) });
     }
     // A known subscription (Netflix, Spotify...) shows up from its first charge in the last 35 days.
     const have = new Set(out.map(b => b.key)), soon = ymd(new Date(new Date(today + 'T12:00:00').getTime() - 35 * 864e5));
@@ -325,6 +335,9 @@
       return { ...b, paid, days, late: !paid && days < 0, due: paid ? `${nextYm(ym)}-${pad(Math.min(b.d, daysIn(nextYm(ym))))}` : `${ym}-${pad(day)}` };
     }).sort((a, b) => a.days - b.days);
   }
+  // The bills due on one day (tomorrow, for the evening reminder). One already charged this month is due again next
+  // month: rent paid on the 1st is due on the 1st after, the day after the 31st.
+  const dueOn = (st, today, day) => upcoming(st, today).filter(b => b.due === day);
 
   // ---------- goals ----------
   // How much to put away each month to finish by the goal's month (at least one month away).
@@ -382,7 +395,7 @@
       if (b.sub && ts.length >= 2) { const a = -ts[ts.length - 1].a, p = -ts[ts.length - 2].a;
         if (a - p >= 0.5 && a > p * 1.03 && ts[ts.length - 1].date >= back(35)) out.push({ key: `up:${b.key}:${ts[ts.length - 1].date}`, kind: 'priceup', title: `${b.n} went up ${fmt(a - p)}`, body: `It's ${fmt(a)} now, was ${fmt(p)}. That's ${fmt((a - p) * 12)} more a year.` }); }
     }
-    const chq = (st.accounts || []).filter(a => !a.other && a.type === 'Chequing' && !a.csv);
+    const chq = (st.accounts || []).filter(a => !a.other && a.type === 'Chequing' && !a.csv && !a.disconnected);
     if (chq.length) {
       const bal = chq.reduce((s, a) => s + inHome(st, a), 0), ids = new Set(chq.map(a => a.id));
       const soon = upcoming(st, today).filter(b => !b.paid && !b.late && b.days <= 7 && (!b.acct || ids.has(b.acct))).reduce((s, b) => s + b.a, 0);
@@ -519,6 +532,6 @@
   }
   const api = { CURRENCIES, homeCur, rate, inHome, missingRates, convertTxn, reconvert, plaidBills, holdings, plaidHoldings, worth, noteWorth, worthSeries, payoff, payFor, yearReview, useCats, lastCat, matchTransfers, payday, safeToSpend, goalSaved, tagTotals, week, alerts, toCsv, ruleName, CATS, CAT_IDS, NOT_SPENDING, catName, round2, ymd, ymOf, ymNow, prevYm, nextYm, daysIn, dayOf, monthsBetween,
     mine, spent, limit, budgeted, totals, perDay, moneyOut, moneyIn, budgetState, budgetStatus,
-    baseName, norm, ruleCat, guessCat, plaidCat, pickCat, parseQuick, csvRows, parseCsv, toDate, bills, billPaid, upcoming, goalMonthly, topMerchants };
+    baseName, norm, ruleCat, guessCat, plaidCat, pickCat, parseQuick, csvRows, parseCsv, toDate, bills, billPaid, upcoming, dueOn, goalMonthly, topMerchants };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Budget = api;
 })(typeof window !== 'undefined' ? window : this);
