@@ -1,6 +1,6 @@
 # What's new in Budget it
 
-## v1.1.0 · Draft, not released yet
+## v1.1.0 · November 11, 2026
 
 **Safer to run, kinder to your history.** Disconnecting a bank no longer throws away its history, one person's wrong passwords no longer lock everyone out, a full disk no longer stops the app, and you can connect your own AI assistant from Settings.
 
