@@ -30,6 +30,7 @@
 - The README has Docker install steps, how updating works, and a list of every setting.
 - When Budget it is updated, a page left open on your phone says "A new version of Budget it is ready" with a Reload button.
 - On an iPhone Home Screen Budget it opens like an app with its own name, and the status bar matches light and dark mode.
+- The assistant's "safe to spend" answer also comes as data (`safe`, `perDay`, `until`, `currency`, `bills`), so other apps like Home it can show it.
 
 ### Improved
 - New bank connections ask for up to two years of history (was 180 days). Only the last 14 days land in "New from your bank".

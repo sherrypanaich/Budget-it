@@ -477,7 +477,9 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
       run(uid) {
         const s = h.stateOf(uid), t = h.today(), x = B.safeToSpend(s, t);
         if (!x) return 'Budget it hasn’t spotted a paycheque yet (it needs two pay deposits from the same place in the last 100 days).';
-        return `Safe to spend until ${x.payday.next} (${x.payday.days} days): ${$(x.amount)}, about ${$(x.perDay)} a day.\nChequing ${$(x.cash)}, credit cards ${$(x.cards)}, bills before payday ${$(x.billsTotal)}${x.bills.length ? ' (' + x.bills.map(b => `${said(b.n)} ${$(b.a)} on ${b.due}`).join(', ') + ')' : ''}.\nPay: ${said(x.payday.name)}, about ${$(x.payday.amount)}, ${x.payday.every}.`;
+        const text = `Safe to spend until ${x.payday.next} (${x.payday.days} days): ${$(x.amount)}, about ${$(x.perDay)} a day.\nChequing ${$(x.cash)}, credit cards ${$(x.cards)}, bills before payday ${$(x.billsTotal)}${x.bills.length ? ' (' + x.bills.map(b => `${said(b.n)} ${$(b.a)} on ${b.due}`).join(', ') + ')' : ''}.\nPay: ${said(x.payday.name)}, about ${$(x.payday.amount)}, ${x.payday.every}.`;
+        // the same numbers as data, in home currency, for apps that show them (Home it's screen)
+        return { text, data: { safe: x.amount, perDay: x.perDay, until: x.payday.next, currency: B.homeCur(s), bills: x.bills.map(b => ({ name: b.n, amount: b.a, date: b.due })) } };
       } },
     { name: 'list_bills', title: 'Bills and subscriptions', annotations: { readOnlyHint: true },
       description: 'Bills and subscriptions Budget it found from repeat charges (plus ones the person added), with when each is due next and whether this month is paid.',
@@ -634,8 +636,10 @@ button{width:100%;margin-top:18px;font:inherit;font-weight:800;font-size:1rem;pa
         const out = t.run(uid, args);   // noted before waiting, so the same call twice in one batch adds once
         if (k) { for (const [x, v] of added) if (Date.now() - v.at >= SAME_MS) added.delete(x); added.set(k, { uid, at: Date.now() }); }
         // $ amounts are Canadian dollars: an answer that doesn't say so already says it once, at the end
-        let text = String(await out); if (home === 'CAD' && /\$\d/.test(text) && !/\bCAD\b/.test(text)) text += '\n(Amounts are in CAD.)';
-        return ok({ content: [{ type: 'text', text }] }); }
+        // A tool can answer { text, data }: data goes out as structuredContent for apps (like Home it) that read numbers
+        const res = await out, data = res && typeof res === 'object' ? res.data : undefined;
+        let text = String(res && typeof res === 'object' ? res.text : res); if (home === 'CAD' && /\$\d/.test(text) && !/\bCAD\b/.test(text)) text += '\n(Amounts are in CAD.)';
+        return ok({ content: [{ type: 'text', text }], ...(data ? { structuredContent: data } : {}) }); }
       catch (e) { return ok({ content: [{ type: 'text', text: e.message }], isError: true }); }
     }
     return fail(-32601, 'Method not found: ' + method);

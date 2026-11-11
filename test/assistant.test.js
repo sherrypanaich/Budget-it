@@ -60,6 +60,11 @@ test('the numbers are the app’s own, and the answer says they’re Canadian do
   has(x, `${ym}: ${$(B.totals(s, ym).left)} left of ${$(B.totals(s, ym).limit)}`);
   assert.ok(!/OVER \(\$0\.00\/day\)/.test(x), 'no “per day” on a budget that’s already over');
   has(await ok('safe_to_spend', {}), `: ${$(B.safeToSpend(s, day()).amount)}, about`);
+  { // Home it reads the same numbers as data
+    const r = await rpc(key, 'tools/call', { name: 'safe_to_spend', arguments: {} }), d = r.structuredContent, want = B.safeToSpend(s, day());
+    assert.deepEqual(d, { safe: want.amount, perDay: want.perDay, until: want.payday.next, currency: 'CAD', bills: want.bills.map(b => ({ name: b.n, amount: b.a, date: b.due })) });
+    assert.match(d.until, /^\d{4}-\d\d-\d\d$/);
+  }
   assert.match(await ok('get_balances', {}), /"US Dollar Account" .*: 640\.00 USD \(about \$[\d,.]+ CAD\)[\s\S]*Net worth: \$[\d,.]+ CAD/);
   assert.match(await ok('spending_summary', {}), /\(\d+ charges?\)/, 'the top places say how many charges');
 });
